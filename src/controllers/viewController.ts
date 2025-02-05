@@ -199,23 +199,18 @@ export const getViewById = async (req: Request, res: Response): Promise<void> =>
 };
 
 
-
-
-
 export const updateView = async (req: Request, res: Response): Promise<void> => {
     try {
+        console.log('Session Data:', req.session);
 
-          // Debug: Log session details
-       console.log('Session Data:', req.session);
-
-       // Retrieve userId from session
-       const userId = req.userId;
+        const userId = req.userId;
         console.log('userId:', userId);
 
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+            return;
+        }
+
         const { projectId, id } = req.params;
         const { name, width, height, backgroundColor, description, property, gridType, items } = req.body;
 
@@ -226,9 +221,7 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
 
         // Check if the project exists
         const existingProject = await prisma.project.findFirst({
-            where: {
-                id: projectId,
-            },
+            where: { id: projectId },
         });
 
         if (!existingProject) {
@@ -238,17 +231,14 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
 
         // Update the view
         const updatedView = await prisma.view.updateMany({
-            where: {
-                id: id,
-                projectId: projectId,
-            },
+            where: { id, projectId },
             data: {
                 name,
                 width,
-                description,
                 height,
                 backgroundColor,
-                property: JSON.stringify(property),
+                description,
+                property: property ? JSON.stringify(property) : null,
                 gridType,
             },
         });
@@ -258,30 +248,29 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
             return;
         }
 
-        // Update the items associated with the view if provided
+        // Update or create items for the view
         if (Array.isArray(items) && items.length > 0) {
             const updatedItems = await Promise.all(
                 items.map(async (item: any) => {
-                    const { id: itemId, ...itemData } = item;
+                    const { id: itemId, property: itemProperty, ...itemData } = item;
 
-                    // Update existing item if `itemId` is provided
+                    // Serialize `property` to JSON string
+                    const serializedProperty = itemProperty ? JSON.stringify(itemProperty) : null;
+
                     if (itemId) {
+                        // Update existing item
                         return prisma.item.update({
                             where: { id: itemId },
                             data: {
                                 ...itemData,
-                                updatedAt: new Date(), // Update timestamp
+                                property: serializedProperty, // Serialize `property`
+                                updatedAt: new Date(),
                             },
                         });
                     }
 
-                    // Create a new item if no `itemId` is provided
-                    return prisma.item.create({
-                        data: {
-                            ...itemData,
-                            viewId: id, // Associate with the current view
-                        },
-                    });
+                    // Create new item if no `itemId` is provided
+                   
                 })
             );
 
@@ -290,10 +279,109 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
 
         res.status(200).json({ message: 'View and associated items updated successfully' });
     } catch (err: any) {
-        console.error(`Failed to update view by ID: ${req.params.id} and projectId: ${req.params.projectId}: ${err.message}`);
-        res.status(500).json({ error: 'unexpected_error', message: 'An error occurred while updating the view and items' });
+        console.error(`Failed to update view by ID: and projectId: : ${err.message}`);
+        res.status(500).json({
+            error: 'unexpected_error',
+            message: 'An error occurred while updating the view and items',
+        });
     }
 };
+
+
+
+
+// export const updateView = async (req: Request, res: Response): Promise<void> => {
+//     try {
+
+//           // Debug: Log session details
+//        console.log('Session Data:', req.session);
+
+//        // Retrieve userId from session
+//        const userId = req.userId;
+//         console.log('userId:', userId);
+
+//        if (!userId) {
+//            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+//            return;
+//        }
+//         const { projectId, id } = req.params;
+//         const { name, width, height, backgroundColor, description, property, gridType, items } = req.body;
+
+//         if (!id || !projectId) {
+//             res.status(400).json({ error: 'validation_error', message: 'Both view ID and project ID are required' });
+//             return;
+//         }
+
+//         // Check if the project exists
+//         const existingProject = await prisma.project.findFirst({
+//             where: {
+//                 id: projectId,
+//             },
+//         });
+
+//         if (!existingProject) {
+//             res.status(404).json({ error: 'not_found', message: 'Project does not exist' });
+//             return;
+//         }
+
+//         // Update the view
+//         const updatedView = await prisma.view.updateMany({
+//             where: {
+//                 id: id,
+//                 projectId: projectId,
+//             },
+//             data: {
+//                 name,
+//                 width,
+//                 description,
+//                 height,
+//                 backgroundColor,
+//                 property: JSON.stringify(property),
+//                 gridType,
+//             },
+//         });
+
+//         if (updatedView.count === 0) {
+//             res.status(404).json({ error: 'not_found', message: 'View not found for the given project' });
+//             return;
+//         }
+
+//         // Update the items associated with the view if provided
+//         if (Array.isArray(items) && items.length > 0) {
+//             const updatedItems = await Promise.all(
+//                 items.map(async (item: any) => {
+//                     const { id: itemId, ...itemData } = item;
+
+//                     // Update existing item if `itemId` is provided
+//                     if (itemId) {
+//                         return prisma.item.update({
+//                             where: { id: itemId },
+//                             data: {
+//                                 ...itemData,
+//                                 updatedAt: new Date(), // Update timestamp
+//                             },
+//                         });
+//                     }
+
+//                     // Create a new item if no `itemId` is provided
+//                     return prisma.item.create({
+//                         data: {
+//                             ...itemData,
+//                             viewId: id, // Associate with the current view
+//                         },
+//                     });
+//                 })
+//             );
+
+//             console.log(`Updated items for view '${id}':`, updatedItems);
+//         }
+
+//         res.status(200).json({ message: 'View and associated items updated successfully' });
+//     } catch (err: any) {
+//         console.error(`Failed to update view by ID: ${req.params.id} and projectId: ${req.params.projectId}: ${err.message}`);
+//         res.status(500).json({ error: 'unexpected_error', message: 'An error occurred while updating the view and items' });
+//     }
+// };
 
 
 // Delete View
