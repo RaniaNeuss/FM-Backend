@@ -59,7 +59,7 @@ router.post("/refreshAccessToken", async (req: Request, res: Response): Promise<
         const newAccessToken = jwt.sign(
             { id: decoded.id },
             process.env.JWT_SECRET as string,
-            { expiresIn: "15m" } // 15 minutes
+            { expiresIn: "120m" } // 15 minutes
         );
 
         res.status(200).json({ accessToken: newAccessToken });
@@ -69,67 +69,6 @@ router.post("/refreshAccessToken", async (req: Request, res: Response): Promise<
 });
 
 
-
-
-
-
-
-
-// router.post("/login", (req: Request, res: Response, next: NextFunction) => {
-//     passport.authenticate(
-        
-//         "local",
-//         (err: Error | null, user: User | false, info: { message: string }) => {
-//             if (err) {
-//                 return res.status(500).json({ message: "Internal error" });
-//             }
-
-//             if (!user) {
-//                 return res.status(401).json({ message: info?.message || "Invalid credentials" });
-//             }
-
-//             req.logIn(user, (loginErr) => {
-//                 if (loginErr) {
-//                     return res.status(500).json({ message: "Login error" });
-//                 }
-
-//                  // **Session for Web Clients**
-//                 req.session.userId = user.id; // Store userId in the session
-
-
-//                 // Generate JWT Token for Mobile Clients
-//                 const accessToken = jwt.sign(
-//                     { id: user.id, username: user.username },
-//                     process.env.JWT_SECRET as string,
-//                     { expiresIn: "15m" } 
-//                 );
-
-//                 const refreshToken = jwt.sign(
-//                     { id: user.id },
-//                     REFRESH_SECRET,
-//                     { expiresIn: "7d" } // 7 days
-//                 );
-
-//         // **Set Refresh Token in HTTP-Only Cookie (Web Only)**
-//                     res.cookie("refreshToken", refreshToken, {
-//                     httpOnly: true,
-//                     secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-//                     sameSite: "strict",
-//                     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-//                 });
-//                 // **Response for Mobile**
-//                 res.status(200).json({
-//                     message: "Logged in successfully",
-//                     user,
-//                     accessToken, 
-//                     refreshToken,
-//                     expiresIn: 15 * 60,
-                      
-//                 });
-//             });
-//         }
-//     )(req, res, next);
-// });
 
 router.post("/login", (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate(
@@ -155,7 +94,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
           const accessToken = jwt.sign(
             { id: user.id, username: user.username },
             process.env.JWT_SECRET as string,
-            { expiresIn: "15m" }
+            { expiresIn: "120m" }
           );
   
           const refreshToken = jwt.sign(
@@ -164,7 +103,14 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
             { expiresIn: "7d" }
           );
   
-          // **Set Refresh Token in HTTP-Only Cookie (Web Only)**
+          // **Set access Token in HTTP-Only Cookie (Web Only)**
+          res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge:  2* 60 * 60 * 1000, 
+          });
+
           res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -178,7 +124,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
             user,
             accessToken,
             refreshToken,
-            expiresIn: 15 * 60,
+            expiresIn:  2* 60 * 60 * 1000,
           });
         });
       }
@@ -195,13 +141,14 @@ router.post("/logout", (req, res) => {
             if (destroyErr) return res.status(500).json({ message: "Error logging out" });
             res.clearCookie("connect.sid"); // Clear the session cookie
             res.clearCookie("refreshToken");
+            res.clearCookie("user")
+            res.clearCookie("accessToken");
             res.json({ message: "Logged out successfully" });
         });
     });
 });
 
 
-// Check authentication status
 router.get('/auth/status', authStatus);
 
 

@@ -169,7 +169,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         // Store the user ID in the session for session-based login
         req.session.userId = user.id;
 
-        
+        res.cookie("accessToken",  accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production", // Set secure flag in production
+            sameSite: "strict",
+            maxAge:   2* 60 * 60 * 1000,
+        });
         // Set refresh token as a secure HTTP-only cookie
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
@@ -186,7 +191,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             message: "User logged in successfully",
             accessToken,
-            expiresIn: 15 * 60, // 15 minutes in seconds
+            expiresIn:  2* 60 * 60 * 1000, // 15 minutes in seconds
             username: user.username,
             groups: user.groups?.map((group) => group.name),
         });
@@ -215,14 +220,14 @@ export const refreshAccessToken = async (req: Request, res: Response): Promise<v
         const newAccessToken = jwt.sign(
             { id: decoded.id },
             JWT_SECRET,
-            { expiresIn: "15m" } // 15 minutes
+            { expiresIn: "120m" } // 
         );
 
         
 
         res.status(200).json({
             accessToken: newAccessToken,
-            expiresIn: 15 , // 15 minutes in seconds
+            expiresIn:  2* 60 * 60 * 1000 , 
         });
     } catch (err) {
         if (err instanceof jwt.TokenExpiredError) {
@@ -264,6 +269,7 @@ export const logout = (req: Request, res: Response): void => {
         // Destroy the session
         req.session.destroy(() => {
             // Clear the refresh token cookie
+            res.clearCookie("accessToken");
             res.clearCookie("refreshToken");
              res.clearCookie("connect.sid");
             res.status(200).json({ message: "User logged out successfully" });

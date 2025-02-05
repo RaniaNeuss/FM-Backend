@@ -157,13 +157,6 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
 };
 
 
-
-
-
-
-  /**
-   * Edit an existing device and update polling/connection behavior dynamically.
-   */
   export const editDevice = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;

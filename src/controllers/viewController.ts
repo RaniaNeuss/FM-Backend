@@ -10,14 +10,10 @@ export const createView = async (req: Request, res: Response): Promise<void> => 
         const { projectId } = req.params;
         const { name, width, height, backgroundColor,gridType,property,description} = req.body;
         const userId = req.userId;
-        // Validate required fields
-        if (!userId  ) {
-            res.status(400).json({
-                error: 'validation_error',
-                message: 'User must be logged in',
-            });
-            return;
-        }
+       //    if (!userId) {
+    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+    //        return;
+    //    }
          const existingproject = await prisma.project.findFirst({
             where: {
                 id:projectId
@@ -79,12 +75,11 @@ export const getAllViews = async (req: Request, res: Response): Promise<void> =>
 
            
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
+   
 
        // Retrieve userId from session
        const userId = req.userId;
-     console.log('userId:', userId);
+
 
        if (!userId) {
            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
@@ -129,12 +124,6 @@ export const getAllViews = async (req: Request, res: Response): Promise<void> =>
 
 
 
-
-
-
-// Get View by ID
-
-
 export const getViewById = async (req: Request, res: Response): Promise<void> => {
     try {
           // Debug: Log session details
@@ -142,12 +131,11 @@ export const getViewById = async (req: Request, res: Response): Promise<void> =>
 
        // Retrieve userId from session
        const userId = req.userId; 
-             console.log('userId:', userId);
 
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
+    //    if (!userId) {
+    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+    //        return;
+    //    }
         const { projectId, id } = req.params; // Retrieve projectId and viewId from params
 
         // Validate required fields
@@ -206,11 +194,6 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
         const userId = req.userId;
         console.log('userId:', userId);
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
-
         const { projectId, id } = req.params;
         const { name, width, height, backgroundColor, description, property, gridType, items } = req.body;
 
@@ -254,8 +237,9 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
                 items.map(async (item: any) => {
                     const { id: itemId, property: itemProperty, ...itemData } = item;
 
-                    // Serialize `property` to JSON string
-                    const serializedProperty = itemProperty ? JSON.stringify(itemProperty) : null;
+                    // Serialize `property` to JSON string if not already serialized
+                    const serializedProperty =
+                        typeof itemProperty === 'string' ? itemProperty : JSON.stringify(itemProperty);
 
                     if (itemId) {
                         // Update existing item
@@ -263,14 +247,20 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
                             where: { id: itemId },
                             data: {
                                 ...itemData,
-                                property: serializedProperty, // Serialize `property`
+                                property: serializedProperty,
                                 updatedAt: new Date(),
                             },
                         });
                     }
 
                     // Create new item if no `itemId` is provided
-                   
+                    return prisma.item.create({
+                        data: {
+                            ...itemData,
+                            property: serializedProperty,
+                            viewId: id, // Associate with the current view
+                        },
+                    });
                 })
             );
 
@@ -279,7 +269,7 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
 
         res.status(200).json({ message: 'View and associated items updated successfully' });
     } catch (err: any) {
-        console.error(`Failed to update view by ID: and projectId: : ${err.message}`);
+        console.error(`Failed to update view by ID and projectId: ${err.message}`);
         res.status(500).json({
             error: 'unexpected_error',
             message: 'An error occurred while updating the view and items',
@@ -287,101 +277,6 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
     }
 };
 
-
-
-
-// export const updateView = async (req: Request, res: Response): Promise<void> => {
-//     try {
-
-//           // Debug: Log session details
-//        console.log('Session Data:', req.session);
-
-//        // Retrieve userId from session
-//        const userId = req.userId;
-//         console.log('userId:', userId);
-
-//        if (!userId) {
-//            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-//            return;
-//        }
-//         const { projectId, id } = req.params;
-//         const { name, width, height, backgroundColor, description, property, gridType, items } = req.body;
-
-//         if (!id || !projectId) {
-//             res.status(400).json({ error: 'validation_error', message: 'Both view ID and project ID are required' });
-//             return;
-//         }
-
-//         // Check if the project exists
-//         const existingProject = await prisma.project.findFirst({
-//             where: {
-//                 id: projectId,
-//             },
-//         });
-
-//         if (!existingProject) {
-//             res.status(404).json({ error: 'not_found', message: 'Project does not exist' });
-//             return;
-//         }
-
-//         // Update the view
-//         const updatedView = await prisma.view.updateMany({
-//             where: {
-//                 id: id,
-//                 projectId: projectId,
-//             },
-//             data: {
-//                 name,
-//                 width,
-//                 description,
-//                 height,
-//                 backgroundColor,
-//                 property: JSON.stringify(property),
-//                 gridType,
-//             },
-//         });
-
-//         if (updatedView.count === 0) {
-//             res.status(404).json({ error: 'not_found', message: 'View not found for the given project' });
-//             return;
-//         }
-
-//         // Update the items associated with the view if provided
-//         if (Array.isArray(items) && items.length > 0) {
-//             const updatedItems = await Promise.all(
-//                 items.map(async (item: any) => {
-//                     const { id: itemId, ...itemData } = item;
-
-//                     // Update existing item if `itemId` is provided
-//                     if (itemId) {
-//                         return prisma.item.update({
-//                             where: { id: itemId },
-//                             data: {
-//                                 ...itemData,
-//                                 updatedAt: new Date(), // Update timestamp
-//                             },
-//                         });
-//                     }
-
-//                     // Create a new item if no `itemId` is provided
-//                     return prisma.item.create({
-//                         data: {
-//                             ...itemData,
-//                             viewId: id, // Associate with the current view
-//                         },
-//                     });
-//                 })
-//             );
-
-//             console.log(`Updated items for view '${id}':`, updatedItems);
-//         }
-
-//         res.status(200).json({ message: 'View and associated items updated successfully' });
-//     } catch (err: any) {
-//         console.error(`Failed to update view by ID: ${req.params.id} and projectId: ${req.params.projectId}: ${err.message}`);
-//         res.status(500).json({ error: 'unexpected_error', message: 'An error occurred while updating the view and items' });
-//     }
-// };
 
 
 // Delete View

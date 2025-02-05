@@ -171,14 +171,7 @@ export const getUsersByProjectId = async (req: Request, res: Response): Promise<
             return;
         }
 
-        //Ensure the logged-in user is the owner or has access
-        // if (project.userId !== userId) {
-        //     res.status(403).json({
-        //         error: 'forbidden',
-        //         message: 'You do not have permission to access this project.',
-        //     });
-        //     return;
-        // }
+       
 
         const assignedUsers = project.users;
 
