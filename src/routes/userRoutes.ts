@@ -153,7 +153,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
   
           // Generate JWT Token for Mobile Clients
           const accessToken = jwt.sign(
-            { id: user.id, email: user.email },
+            { id: user.id, username: user.username },
             process.env.JWT_SECRET as string,
             { expiresIn: "15m" }
           );

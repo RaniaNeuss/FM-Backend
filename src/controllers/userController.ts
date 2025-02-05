@@ -122,36 +122,36 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
-        // Validate email and password
-        if (!email || !password) {
-            res.status(400).json({ message: "email and password are required" });
+        // Validate username and password
+        if (!username || !password) {
+            res.status(400).json({ message: "username and password are required" });
             return;
         }
 
         // Check if the user exists
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { username },
             include: { groups: true },
         });
 
         if (!user) {
-            res.status(401).json({ message: "Invalid email or password" });
+            res.status(401).json({ message: "Invalid username or password" });
             return;
         }
 
         // Verify the password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            res.status(401).json({ message: "Invalid email or password" });
+            res.status(401).json({ message: "Invalid username or password" });
             return;
         }
 
         
         // Generate Access Token (short-lived, stored in localStorage on the frontend)
         const accessToken = jwt.sign(
-            { id: user.id, email: user.email },
+            { id: user.id, username: user.username },
             JWT_SECRET,
             { expiresIn: "15m" } // 15 minutes
         );
@@ -187,7 +187,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             message: "User logged in successfully",
             accessToken,
             expiresIn: 15 * 60, // 15 minutes in seconds
-            email: user.email,
+            username: user.username,
             groups: user.groups?.map((group) => group.name),
         });
     } catch (err: any) {
@@ -245,7 +245,7 @@ export const authStatus = async (req: Request, res: Response): Promise<void> => 
     if (req.isAuthenticated()) {
         res.status(200).json({
             message: "User logged in successfully",
-            email: (req.user as any).email, // Use 'as any' or type your 'req.user' properly
+            username: (req.user as any).username, // Use 'as any' or type your 'req.user' properly
         });
     } else {
         res.status(401).json({ message: "Unauthorized user" });
@@ -343,7 +343,7 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
        if (!userId) {
            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
            return;
-       }        const { name, email, info } = req.body; // Retrieve the fields to update from the request body
+       }        const { name, info } = req.body; // Retrieve the fields to update from the request body
 
         // Validate `id`
         if (!userId) {
@@ -376,14 +376,14 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Validate `email`
-        if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
-            res.status(400).json({
-                error: "validation_error",
-                message: "Email must be a valid email address.",
-            });
-            return;
-        }
+        // // Validate `email`
+        // if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+        //     res.status(400).json({
+        //         error: "validation_error",
+        //         message: "Email must be a valid email address.",
+        //     });
+        //     return;
+        // }
 
         // Validate `info`
         if (info && typeof info !== "string") {
@@ -399,7 +399,7 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
             where: {  id: String(userId) },
             data: {
                 name,
-                email,
+               
                 info,
                 updatedAt: new Date(),
             },

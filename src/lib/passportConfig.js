@@ -35,12 +35,12 @@ import passport from "passport";
 
 passport.use(
     new LocalStrategy(
-      {  usernameField: "email", passwordField: "password" }, // Specify the field names
-      async (email, password, done) => {
+      {  usernameField: "username", passwordField: "password" }, // Specify the field names
+      async (username, password, done) => {
         try {
-          // Find user by email
+          // Find user by username
           const user = await prisma.user.findUnique({
-            where: { email }, // Query using email
+            where: { username }, // Query using username
             include: { groups: true }, // Include related groups
           });
   
