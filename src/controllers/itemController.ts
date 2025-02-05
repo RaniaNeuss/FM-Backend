@@ -3,10 +3,61 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Create Item by view id
-export const createItem = async (req: Request, res: Response): Promise<void> => {
+// export const createItem = async (req: Request, res: Response): Promise<void> => {
+//     try {
+//         const { viewId } = req.params; // Retrieve viewId from params
+//         const { type, name, property, events, actions, label, x, y, scale, rotation, tagId } = req.body;
+
+//         // Validate viewId
+//         if (!viewId) {
+//             res.status(400).json({ error: 'validation_error', message: 'View ID is required.' });
+//             return;
+//         }
+
+//         // Check if the view exists
+//         const view = await prisma.view.findUnique({
+//             where: { id: viewId },
+//         });
+
+//         if (!view) {
+//             res.status(404).json({ error: 'not_found', message: 'View not found.' });
+//             return;
+//         }
+
+//         // Create the new item
+//         const newItem = await prisma.item.create({
+//             data: {
+//                 viewId,
+//                 type,
+//                 name,
+//                 property: property ? JSON.stringify(property) : null,
+//                 events: events ? JSON.stringify(events) : null,
+//                 actions: actions ? JSON.stringify(actions) : null,
+//                 label,
+//                 x,
+//                 y,
+//                 scale,
+//                 rotation,
+//                 tagId,
+//             },
+//         });
+
+//         res.status(201).json(newItem);
+//     } catch (err: any) {
+//         console.error('Failed to create item:', err.message);
+//         res.status(500).json({
+//             error: 'unexpected_error',
+//             message: 'An error occurred while creating the item.',
+//         });
+//     }
+// };
+
+
+
+export const createItems = async (req: Request, res: Response): Promise<void> => {
     try {
         const { viewId } = req.params; // Retrieve viewId from params
-        const { type, name, property, events, actions, label, x, y, scale, rotation, tagId } = req.body;
+        const items = req.body.items; // Expect an array of items in the body
 
         // Validate viewId
         if (!viewId) {
@@ -24,30 +75,40 @@ export const createItem = async (req: Request, res: Response): Promise<void> => 
             return;
         }
 
-        // Create the new item
-        const newItem = await prisma.item.create({
-            data: {
-                viewId,
-                type,
-                name,
-                property: property ? JSON.stringify(property) : null,
-                events: events ? JSON.stringify(events) : null,
-                actions: actions ? JSON.stringify(actions) : null,
-                label,
-                x,
-                y,
-                scale,
-                rotation,
-                tagId,
-            },
-        });
+        // Validate the items array
+        if (!Array.isArray(items) || items.length === 0) {
+            res.status(400).json({ error: 'validation_error', message: 'Items array must be provided and not empty.' });
+            return;
+        }
 
-        res.status(201).json(newItem);
+        // Map through the items array and prepare the data for creation
+        const newItems = await prisma.$transaction(
+            items.map((item) => 
+                prisma.item.create({
+                    data: {
+                        viewId,
+                        type: item.type,
+                        name: item.name,
+                        property: item.property ? JSON.stringify(item.property) : null,
+                        events: item.events ? JSON.stringify(item.events) : null,
+                        actions: item.actions ? JSON.stringify(item.actions) : null,
+                        label: item.label,
+                        x: item.x,
+                        y: item.y,
+                        scale: item.scale,
+                        rotation: item.rotation,
+                        tagId: item.tagId,
+                    },
+                })
+            )
+        );
+
+        res.status(201).json(newItems);
     } catch (err: any) {
-        console.error('Failed to create item:', err.message);
+        console.error('Failed to create items:', err.message);
         res.status(500).json({
             error: 'unexpected_error',
-            message: 'An error occurred while creating the item.',
+            message: 'An error occurred while creating the items.',
         });
     }
 };
