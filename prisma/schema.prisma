@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+
+
+model Project {
+  id            String          @id @default(uuid())
+  name          String          
+  description   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  alarms        Alarm[]
+  devices       Device[]
+  reports       Report[]
+  scripts       Script[]
+  texts         Text[]
+  events        Event[]
+  views         View[]
+  users         User[]   @relation("ProjectToUser")
+  userId      String   // Foreign key to the User
+  @@unique([name, userId]) // Enforce uniqueness of project name per user
+  notifications Notification[]  // Add this line to establish the relationship
+
+  settings      Settings?       @relation("ProjectSettings")  
+
+}
+
+
+model User {
+  id        String          @id @default(uuid())
+  username  String          @unique
+  name      String?
+  email     String         @unique
+  info      String?
+  password  String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  projects  Project[]       @relation("ProjectToUser")
+  groups    Group[]   @relation("UserGroups")
+  alarms    Alarm[]         @relation("AlarmAcknowledgements") // Fixed relation to Alarm model
+}
+
+
+
+
+model View {
+  id                String   @id @default(uuid())
+  name             String  @unique
+  projectId        String
+  description      String?
+  width            Int?
+  property   String?     // JSON field to store basic objects  
+  height           Int?
+  backgroundColor  String?
+  gridType         String?
+  type             String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  items            Item[]
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+
+
+model Item {
+  id         String   @id @default(uuid())
+  viewId     String
+  type       String?   // 'widget' or 'symbol'
+  name       String?
+  property   String?     // JSON field to store properties  
+  events     String?     // JSON field to store events (e.g., actoptions or onclose)
+  actions    String?     // JSON field to store actions (e.g., anticlockwise,  range, variableId, bitmask, range, type, and options.) 
+  label      String?
+  stroke     String?
+  x          Float?
+  y          Float?
+  scale      Float?   @default(1.0)
+  rotation   Float?   @default(0.0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  tagId      String?  // Add this field
+
+  tag        Tag?     @relation(fields: [tagId], references: [id])
+  view       View     @relation(fields: [viewId], references: [id], onDelete: Cascade)
+}
+
+model Tag {
+  id         String   @id @default(uuid())
+  name       String? 
+  value      String?
+  label      String?
+  type       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  deviceId   String
+  daq        Daq?
+  alarms     Alarm[]  @relation("TagAlarms") // Relation to Alarm
+
+  items      Item[]
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, name: "DeviceTags")
+  @@unique([deviceId, name]) // Ensure tags are unique within the scope of a device
+
+}
+
+model Variable {
+  id        String   @id @default(uuid()) 
+  name      String
+  type      String
+  value     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  daqs      Daq[]    @relation("VariableToDaq") 
+
+}
+
+
+
+model Daq {
+  id        String   @id @default(uuid())
+  enabled   Boolean
+  timestamp DateTime @default(now())
+  value     String
+  interval  Int
+  changed   Boolean
+  restored  Boolean
+  variableId String
+  variable  Variable @relation(fields: [variableId], references: [id], name: "VariableToDaq")
+  tagId     String   @unique
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+}
+
+model Device {
+  id            String    @id @default(uuid())
+  projectId     String
+  name          String    @unique
+  description   String?
+  type          String?
+  property      String?
+  enabled       Boolean   @default(false)
+  polling       Int?
+  lastConnected DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tags          Tag[]     @relation("DeviceTags")
+  deviceSecurity DeviceSecurity?
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model DeviceSecurity {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  value    String
+  deviceId String  @unique
+  device   Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model Alarm {
+  id             String         @id @default(uuid())
+  projectId      String
+  status         String?
+  name           String? 
+  text           String? 
+  type           String?
+  subproperty    String?
+  tagId          String         // Foreign key to associate with a Tag
+  min            Float?         // Minimum threshold for the alarm
+  max            Float?         // Maximum threshold for the alarm
+  interval       Int?           // Interval in seconds
+  actions        String?
+  isEnabled      Boolean        @default(false)
+  ontime         DateTime?
+  offtime        DateTime?
+  acktime        DateTime?
+  userAck        String?
+  lastCheck      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  project        Project        @relation(fields: [projectId], references: [id])
+  tag            Tag            @relation(fields: [tagId], references: [id], name: "TagAlarms") // Relation to Tag
+  alarmHistories AlarmHistory[]
+  users          User[]         @relation("AlarmAcknowledgements")
+}
+
+model AlarmHistory {
+  id        String    @id @default(uuid())
+  alarmId   String
+  type      String?
+  status    String?
+  message   String?
+  group     String?  // Group associated with the alarm history
+  text      String?  // Additional details or description
+  onTime    DateTime?
+  offTime   DateTime?
+  ackTime   DateTime?
+  userAck   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  alarm     Alarm     @relation(fields: [alarmId], references: [id])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  projectId   String
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id])
+}
+
+model Group {
+  id       String  @id @default(uuid())
+  name     String    @unique
+  users    User[]    @relation("UserGroups")
+
+}
+
+model Settings {
+  id                   String   @id @default(uuid())
+  system               String?
+  smtp                 String?
+  daqstore             String?
+  alarms               String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  project              Project  @relation("ProjectSettings", fields: [projectId], references: [id], onDelete: Cascade)
+  projectId            String   @unique
+}
+
+
+
+model Notification {
+  id            String   @id @default(uuid())
+  name          String
+  receiver      String
+  type          String
+  delay         Int?     @default(1)
+  interval      Int?     @default(0)   
+  enabled       Boolean  @default(false)
+  subscriptions String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+    projectId     String   // Foreign key to the Project
+
+    project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade) // Add this line to establish the relationship
+
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  name        String
+  receiver    String
+  scheduling  String
+  docproperty String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+   projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model Script {
+  id         String   @id @default(uuid())
+  name       String
+  sync       Boolean  @default(false)
+  parameters String?
+  mode       String
+  code       String
+  permission Int
+  scheduling String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model Text {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model General {
+  id    String @id @default(uuid())
+  name  String @unique
+  value String
+}
