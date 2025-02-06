@@ -5,11 +5,11 @@ import { Strategy as LocalStrategy } from "passport-local";
 import passport from "passport";
 
 // passport.use(
-//     new LocalStrategy(async (username, password, done) => {
+//     new LocalStrategy(async (email, password, done) => {
 //         try {
-//             // Find user by username
+//             // Find user by email
 //             const user = await prisma.user.findUnique({
-//                 where: { username },
+//                 where: { email },
 //                 include: { groups: true }, // Include related groups
 //             });
 
@@ -35,12 +35,12 @@ import passport from "passport";
 
 passport.use(
     new LocalStrategy(
-      {  usernameField: "username", passwordField: "password" }, // Specify the field names
-      async (username, password, done) => {
+      {  usernameField: "email", passwordField: "password" }, // Specify the field names
+      async (email, password, done) => {
         try {
-          // Find user by username
+          // Find user by email
           const user = await prisma.user.findUnique({
-            where: { username }, // Query using username
+            where: { email }, // Query using email
             include: { groups: true }, // Include related groups
           });
   

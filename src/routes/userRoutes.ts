@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUsers,refreshtoken, createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editUser } from '../controllers/userController';
+import { getUsers,refreshtoken, Register,createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editUser } from '../controllers/userController';
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import session from 'express-session';
@@ -38,6 +38,7 @@ router.delete('/groups/:id',authenticateUser, deleteGroup);
 // User routes
 router.get('/',authenticateUser, getUsers);
 router.post('/',authenticateUser, createUser);
+router.post('/register', Register);
 router.delete('/:id',authenticateUser, deleteUser);
 router.get('/:id',authenticateUser, getUser);
 router.put('/',authenticateUser, editUser);
@@ -92,7 +93,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
   
           // Generate JWT Token for Mobile Clients
           const token = jwt.sign(
-            { id: user.id, username: user.username },
+            { id: user.id, email: user.email },
             JWT_SECRET,
             { expiresIn: "120m" }
           );

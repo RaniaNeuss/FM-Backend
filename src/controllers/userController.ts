@@ -16,10 +16,6 @@ declare global {
 
 
 
-
-
-
-
 // Controller: Create User
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -28,14 +24,15 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
         console.log('Session Data:', req.session);
 
         // Retrieve userId from session
-         const userId = req.userId;        console.log('userId:', userId);
+         const userId = req.userId;   
+         
 
         if (!userId) {
             res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
             return;
         }
         // Validate request body
-        const { username, email, name, password, group } = req.body;
+        const { username, email, password, group } = req.body;
 
         if (!username || typeof username !== "string") {
             console.warn("Validation failed: username is missing or invalid");
@@ -43,11 +40,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
             return;
         }
 
-        if (!name || typeof name !== "string") {
-            console.warn("Validation failed: name is missing or invalid");
-            res.status(400).json({ error: "validation_error", message: "Valid name is required" });
-            return;
-        }
+    
         if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
              console.warn("Validation failed: email is missing or invalid");
             res.status(400).json({ error: "validation_error", message: "Valid email is required" });
@@ -66,11 +59,19 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
             return;
         }
 
+      
         // Check if the user already exists
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
+        const existingEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingEmail) {
              console.warn(`User creation failed: email "${email}" already exists`);
             res.status(409).json({ error: "conflict_error", message: `email "${email}" is already taken` });
+            return;
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { username } });
+        if (existingUser) {
+             console.warn(`User creation failed: username "${username}" already exists`);
+            res.status(409).json({ error: "conflict_error", message: `username "${username}" is already taken` });
             return;
         }
 
@@ -90,7 +91,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
             data: {
                 username,
                 email,
-                name,
+                
                 password: hashedPassword,
                 groups: {
                     connect: [{ id: existingGroup.id }],
@@ -98,7 +99,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
             },
         });
 
-         console.info(`User created successfully: ${newUser.username}`);
+         console.info(`User created successfully: ${newUser.email}`);
         res.status(201).json({
             message: "User created successfully",
             user: {
@@ -115,6 +116,81 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     }
 };
 
+export const Register= async (req: Request, res: Response): Promise<void> => {
+    try {
+        
+        
+       
+        // Validate request body
+        const { username, email, password  } = req.body;
+
+        if (!username || typeof username !== "string") {
+            console.warn("Validation failed: username is missing or invalid");
+            res.status(400).json({ error: "validation_error", message: "Valid username is required" });
+            return;
+        }
+
+    
+        if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+             console.warn("Validation failed: email is missing or invalid");
+            res.status(400).json({ error: "validation_error", message: "Valid email is required" });
+            return;
+        }
+
+        if (!password || typeof password !== "string" || password.length < 6) {
+             console.warn("Validation failed: password is missing or too short");
+            res.status(400).json({ error: "validation_error", message: "Password must be at least 6 characters long" });
+            return;
+        }
+
+      
+        // Check if the user already exists
+        const existingEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingEmail) {
+             console.warn(`User creation failed: email "${email}" already exists`);
+            res.status(409).json({ error: "conflict_error", message: `email "${email}" is already taken` });
+            return;
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { username } });
+        if (existingUser) {
+             console.warn(`User creation failed: username "${username}" already exists`);
+            res.status(409).json({ error: "conflict_error", message: `username "${username}" is already taken` });
+            return;
+        }
+     
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create the new user
+        const newUser = await prisma.user.create({
+            data: {
+                username,
+                email,
+                
+                password: hashedPassword,
+               
+            },
+        });
+
+         console.info(`User created successfully: ${newUser.email}`);
+        res.status(201).json({
+            message: "User created successfully",
+            user: {
+                id: newUser.id,
+                name:  newUser.name,
+                username: newUser.username,
+                email: newUser.email,
+               
+            },
+        });
+    } catch (err: any) {
+        console.error(`Failed to create user: ${err.message}`);
+        handleError(res, err, "api create user");
+    }
+};
+
 // Controller: Sign in User
 
 
@@ -122,36 +198,36 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
-        // Validate username and password
-        if (!username || !password) {
-            res.status(400).json({ message: "username and password are required" });
+        // Validate email and password
+        if (!email || !password) {
+            res.status(400).json({ message: "email and password are required" });
             return;
         }
 
         // Check if the user exists
         const user = await prisma.user.findUnique({
-            where: { username },
+            where: { email },
             include: { groups: true },
         });
 
         if (!user) {
-            res.status(401).json({ message: "Invalid username or password" });
+            res.status(401).json({ message: "Invalid email or password" });
             return;
         }
 
         // Verify the password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            res.status(401).json({ message: "Invalid username or password" });
+            res.status(401).json({ message: "Invalid email or password" });
             return;
         }
 
         
         // Generate Access Token (short-lived, stored in localStorage on the frontend)
         const token = jwt.sign(
-            { id: user.id, username: user.username },
+            { id: user.id, email: user.email },
             JWT_SECRET,
             { expiresIn: "15m" } // 15 minutes
         );
@@ -192,7 +268,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             message: "User logged in successfully",
             token,
             expiresIn:  2* 60 * 60 * 1000, // 15 minutes in seconds
-            username: user.username,
+            email: user.email,
             groups: user.groups?.map((group) => group.name),
         });
     } catch (err: any) {
@@ -250,7 +326,7 @@ export const authStatus = async (req: Request, res: Response): Promise<void> => 
     if (req.isAuthenticated()) {
         res.status(200).json({
             message: "User logged in successfully",
-            username: (req.user as any).username, // Use 'as any' or type your 'req.user' properly
+            email: (req.user as any).email, // Use 'as any' or type your 'req.user' properly
         });
     } else {
         res.status(401).json({ message: "Unauthorized user" });
@@ -349,7 +425,7 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
        if (!userId) {
            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
            return;
-       }        const { name, info } = req.body; // Retrieve the fields to update from the request body
+       }        const {email, name, info,username,password ,group} = req.body; // Retrieve the fields to update from the request body
 
         // Validate `id`
         if (!userId) {
@@ -373,23 +449,32 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Validate `name`
-        if (name && typeof name !== "string") {
-            res.status(400).json({
-                error: "validation_error",
-                message: "Name must be a valid string.",
-            });
+      
+
+        if (!username || typeof username !== "string") {
+            console.warn("Validation failed: username is missing or invalid");
+            res.status(400).json({ error: "validation_error", message: "Valid username is required" });
             return;
         }
 
-        // // Validate `email`
-        // if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
-        //     res.status(400).json({
-        //         error: "validation_error",
-        //         message: "Email must be a valid email address.",
-        //     });
-        //     return;
-        // }
+    
+        if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+             console.warn("Validation failed: email is missing or invalid");
+            res.status(400).json({ error: "validation_error", message: "Valid email is required" });
+            return;
+        }
+
+        if (!password || typeof password !== "string" || password.length < 6) {
+             console.warn("Validation failed: password is missing or too short");
+            res.status(400).json({ error: "validation_error", message: "Password must be at least 6 characters long" });
+            return;
+        }
+
+        if (!group || typeof group !== "string") {
+             console.warn("Validation failed: group is missing or invalid");
+            res.status(400).json({ error: "validation_error", message: "Valid group is required" });
+            return;
+        }
 
         // Validate `info`
         if (info && typeof info !== "string") {
@@ -400,13 +485,26 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+
+        // Check if the group exists
+        const existingGroup = await prisma.group.findUnique({ where: { name: group } });
+        if (!existingGroup) {
+             console.warn(`User creation failed: group "${group}" does not exist`);
+            res.status(404).json({ error: "not_found", message: `Group "${group}" does not exist` });
+            return;
+        }
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
         // Update the user in the database
         const updatedUser = await prisma.user.update({
             where: {  id: String(userId) },
             data: {
-                name,
-               
-                info,
+                email, name, info,username
+                ,  password: hashedPassword,
+                groups: {
+                    connect: [{ id: existingGroup.id }],
+                },
+
                 updatedAt: new Date(),
             },
         });
