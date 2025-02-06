@@ -1,3 +1,5 @@
-npx prisma db seed
+1-npx prisma db push
 
-npx prisma db push
+2-npx prisma db seed
+
+
