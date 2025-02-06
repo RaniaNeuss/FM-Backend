@@ -37,7 +37,9 @@ router.delete('/groups/:id',authenticateUser, deleteGroup);
 
 // User routes
 router.get('/',authenticateUser, getUsers);
-router.post('/',authenticateUser, createUser);
+router.post('/', createUser);
+// router.post('/',authenticateUser, createUser);
+
 router.post('/register', Register);
 router.delete('/:id',authenticateUser, deleteUser);
 router.get('/:id',authenticateUser, getUser);

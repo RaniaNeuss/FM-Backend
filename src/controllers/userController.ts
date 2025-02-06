@@ -27,10 +27,10 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
          const userId = req.userId;   
          
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
+        // if (!userId) {
+        //     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+        //     return;
+        // }
         // Validate request body
         const { username, email, password, group } = req.body;
 
