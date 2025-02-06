@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "nodemon -r tsconfig-paths/register -r ts-node/register/transpile-only src/server.ts"
   },
+ "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

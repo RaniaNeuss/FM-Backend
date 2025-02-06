@@ -16,21 +16,21 @@ declare global {
 
 
 
+
 // Controller: Create User
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
         
-        // Debug: Log session details
-        console.log('Session Data:', req.session);
+       
 
         // Retrieve userId from session
          const userId = req.userId;   
          
 
-        // if (!userId) {
-        //     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-        //     return;
-        // }
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+            return;
+        }
         // Validate request body
         const { username, email, password, group } = req.body;
 
