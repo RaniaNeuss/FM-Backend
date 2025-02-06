@@ -150,7 +150,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
         
         // Generate Access Token (short-lived, stored in localStorage on the frontend)
-        const accessToken = jwt.sign(
+        const token = jwt.sign(
             { id: user.id, username: user.username },
             JWT_SECRET,
             { expiresIn: "15m" } // 15 minutes
@@ -169,7 +169,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         // Store the user ID in the session for session-based login
         req.session.userId = user.id;
 
-        res.cookie("accessToken",  accessToken, {
+        res.cookie("token",  token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production", // Set secure flag in production
             sameSite: "strict",
@@ -190,7 +190,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         // Send access token to frontend for localStorage
         res.status(200).json({
             message: "User logged in successfully",
-            accessToken,
+            token,
             expiresIn:  2* 60 * 60 * 1000, // 15 minutes in seconds
             username: user.username,
             groups: user.groups?.map((group) => group.name),
@@ -201,7 +201,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const refreshAccessToken = async (req: Request, res: Response): Promise<void> => {
+export const refreshtoken = async (req: Request, res: Response): Promise<void> => {
     
     const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
@@ -217,7 +217,7 @@ export const refreshAccessToken = async (req: Request, res: Response): Promise<v
         console.log("Token successfully verified for user ID:", decoded.id);
 
         // Generate a new access token
-        const newAccessToken = jwt.sign(
+        const newtoken = jwt.sign(
             { id: decoded.id },
             JWT_SECRET,
             { expiresIn: "120m" } // 
@@ -226,7 +226,7 @@ export const refreshAccessToken = async (req: Request, res: Response): Promise<v
         
 
         res.status(200).json({
-            accessToken: newAccessToken,
+            token: newtoken,
             expiresIn:  2* 60 * 60 * 1000 , 
         });
     } catch (err) {
@@ -269,7 +269,7 @@ export const logout = (req: Request, res: Response): void => {
         // Destroy the session
         req.session.destroy(() => {
             // Clear the refresh token cookie
-            res.clearCookie("accessToken");
+            res.clearCookie("token");
             res.clearCookie("refreshToken");
              res.clearCookie("connect.sid");
             res.status(200).json({ message: "User logged out successfully" });
@@ -591,7 +591,7 @@ function handleError(res: Response, err: any, context: string): void {
 //         }
 
 //         // Generate Access Token (short-lived, stored in localStorage on the frontend)
-//         const accessToken = jwt.sign(
+//         const token = jwt.sign(
 //             { id: user.id, email: user.email },
 //             JWT_SECRET,
 //             { expiresIn: "15m" } // 15 minutes
@@ -622,7 +622,7 @@ function handleError(res: Response, err: any, context: string): void {
 //         // Send access token to frontend for localStorage
 //         res.status(200).json({
 //             message: "User logged in successfully",
-//             accessToken,
+//             token,
 //             expiresIn: 15 * 60, // 15 minutes in seconds
 //             email: user.email,
 //             groups: user.groups?.map((group) => group.name),

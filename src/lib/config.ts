@@ -9,6 +9,6 @@ export const SESSION_SECRET=process.env.SESSION_SECRET as string;
 export const PORT = process.env.PORT as string;
 
 // Optional: Add validation to ensure the variables exist
-if (!JWT_SECRET || !REFRESH_SECRET) {
+if (!JWT_SECRET || !REFRESH_SECRET ||!SESSION_SECRET ) {
   throw new Error("Missing required environment variables: JWT_SECRET or REFRESH_SECRET");
 }

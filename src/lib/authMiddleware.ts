@@ -1,21 +1,17 @@
 import jwt from "jsonwebtoken";
-import { Request, Response,NextFunction  } from "express";
-import dotenv from "dotenv";
+import { Request, Response, NextFunction } from "express";
+import { JWT_SECRET } from "../lib/config";
 
-dotenv.config(); // Load environment variables
 declare module "express-serve-static-core" {
     interface Request {
         userId?: string;
     }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-
-
 export const authenticateUser = (req: Request, res: Response, next: NextFunction): void => {
     // 1. Check Session-Based Authentication
     if (req.session && req.session.userId) {
+        console.log("Authenticated using session.");
         req.userId = req.session.userId; // Attach userId from session
         return next(); // Call next middleware
     }
@@ -25,20 +21,17 @@ export const authenticateUser = (req: Request, res: Response, next: NextFunction
     if (authHeader && authHeader.startsWith("Bearer ")) {
         const token = authHeader.split(" ")[1];
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as unknown as { id: string };
-            req.userId = decoded.id; // Attach userId from JWT
+            const decoded = jwt.verify(token, JWT_SECRET) as { id: string }; // Decode the token
+            console.log("Authenticated using JWT.");
+            req.userId = decoded.id; // Attach userId from JWT payload
             return next(); // Call next middleware
         } catch (err) {
-            if (err instanceof Error) {
-                console.error("Invalid JWT:", err.message);
-            } else {
-                console.error("Invalid JWT:", err);
-            }
+            console.error("JWT validation failed:", err);
             res.status(401).json({ message: "Invalid token" });
-            return;
         }
     }
 
     // 3. If Neither Session Nor JWT Exists
+    console.warn("Authentication failed: No session or valid token found.");
     res.status(401).json({ message: "User is not authenticated" });
 };

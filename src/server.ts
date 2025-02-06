@@ -2,7 +2,6 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import session from 'express-session';
 import passport from './lib/passportConfig';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from "cookie-parser";
 import swaggerDocument from './swagger.json';

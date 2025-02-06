@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUsers,refreshAccessToken, createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editUser } from '../controllers/userController';
+import { getUsers,refreshtoken, createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editUser } from '../controllers/userController';
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import session from 'express-session';
@@ -44,7 +44,7 @@ router.put('/',authenticateUser, editUser);
 
 
 
-router.post("/refreshAccessToken", async (req: Request, res: Response): Promise<void> => {
+router.post("/refreshtoken", async (req: Request, res: Response): Promise<void> => {
     const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
     if (!refreshToken) {
@@ -56,13 +56,13 @@ router.post("/refreshAccessToken", async (req: Request, res: Response): Promise<
         const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET as string) as { id: string };
 
         // Generate a new access token
-        const newAccessToken = jwt.sign(
+        const newtoken = jwt.sign(
             { id: decoded.id },
             process.env.JWT_SECRET as string,
             { expiresIn: "120m" } // 15 minutes
         );
 
-        res.status(200).json({ accessToken: newAccessToken });
+        res.status(200).json({ token: newtoken });
     } catch (err) {
         res.status(403).json({ message: "Invalid refresh token" });
     }
@@ -91,9 +91,9 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
           req.session.userId = user.id; // Store userId in the session
   
           // Generate JWT Token for Mobile Clients
-          const accessToken = jwt.sign(
+          const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.JWT_SECRET as string,
+            JWT_SECRET,
             { expiresIn: "120m" }
           );
   
@@ -104,7 +104,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
           );
   
           // **Set access Token in HTTP-Only Cookie (Web Only)**
-          res.cookie("accessToken", accessToken, {
+          res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
@@ -122,7 +122,7 @@ router.post("/login", (req: Request, res: Response, next: NextFunction) => {
           res.status(200).json({
             message: "Logged in successfully",
             user,
-            accessToken,
+            token,
             refreshToken,
             expiresIn:  2* 60 * 60 * 1000,
           });
@@ -142,7 +142,7 @@ router.post("/logout", (req, res) => {
             res.clearCookie("connect.sid"); // Clear the session cookie
             res.clearCookie("refreshToken");
             res.clearCookie("user")
-            res.clearCookie("accessToken");
+            res.clearCookie("token");
             res.json({ message: "Logged out successfully" });
         });
     });
