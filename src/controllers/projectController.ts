@@ -191,7 +191,6 @@ export const getUsersByProjectId = async (req: Request, res: Response): Promise<
 
 
 
-
 // Controller: Fetch All Projects
 export const getAllProjects = async (req: Request, res: Response): Promise<void> => {
     try {
