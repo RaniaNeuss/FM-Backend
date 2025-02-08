@@ -32,7 +32,6 @@ export const createDeviceAPI = async (req: Request, res: Response): Promise<void
     // Extract tags from the API response
     const tags = extractTags(await axios({ url: address, method }).then((res) => res.data));
 
-    // Create the device along with its tags, including the value in tags
     const newDevice = await prisma.device.create({
       data: {
         projectId,
@@ -44,18 +43,9 @@ export const createDeviceAPI = async (req: Request, res: Response): Promise<void
         polling,
         createdAt: new Date(),
         updatedAt: new Date(),
-        // tags: {
-        //   create: tags.map((tag) => ({
-        //     name: tag.name,
-        //     type: tag.type,
-        //     label: tag.label,
-        //     // value: tag.value, // Save the value directly in the tags table
-        //     createdAt: new Date(),
-        //     updatedAt: new Date(),
-        //   })),
-        // },
+       
       },
-      include: { tags: true }, // Include tags to get their IDs
+      include: { tags: true },
     });
 
     // Return the newly created device with its tags
@@ -155,24 +145,26 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
 
   export const editDevice = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
-      const { name, description, property, enabled, polling } = req.body;
+      const { id } = req.params; 
+      const { name, description, property, enabled, polling } = req.body; 
   
       const parsedProperty = JSON.stringify(property);
-  
-      // Get the previous device details
+    
       const prevDevice = await prisma.device.findUnique({ where: { id } });
       if (!prevDevice) {
         res.status(404).json({ error: 'Device not found' });
         return;
       }
-          // Check for duplicate device
-    const existingDevice = await prisma.device.findUnique({ where: { name } });
-    if (existingDevice) {
-      console.error("Device with the same name already exists.");
-      res.status(400).json({ error: 'Device with the same name already exists' });
-      return;
-    }
+  
+      if (name && name !== prevDevice.name) {
+        const existingDevice = await prisma.device.findUnique({ where: { name } });
+        if (existingDevice) {
+          console.error('Device with the same name already exists.');
+          res.status(400).json({ error: 'Device with the same name already exists' });
+          return;
+        }
+      }
+  
       // Update the device in the database
       const updatedDevice = await prisma.device.update({
         where: { id },
@@ -187,7 +179,7 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
   
       console.log(`Device '${id}' updated in the database.`);
   
-    
+      // Handle changes in polling or enabled state
   
       res.status(200).json(updatedDevice);
     } catch (error) {
@@ -196,50 +188,8 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
     }
   };
 
-  // export const editDeviceAPI = async (req: Request, res: Response): Promise<void> => {
-  //   try {
-  //     const { id } = req.params;
-  //     const { name, description, property, enabled, polling } = req.body;
-  
-  //     const parsedProperty = JSON.stringify(property);
-  
-  //     // Get the previous device details
-  //     const prevDevice = await prisma.device.findUnique({ where: { id } });
-  //     if (!prevDevice) {
-  //       res.status(404).json({ error: 'Device not found' });
-  //       return;
-  //     }
-  //         // Check for duplicate device
-  //   const existingDevice = await prisma.device.findUnique({ where: { name } });
-  //   if (existingDevice) {
-  //     console.error("Device with the same name already exists.");
-  //     res.status(400).json({ error: 'Device with the same name already exists' });
-  //     return;
-  //   }
-  //     // Update the device in the database
-  //     const updatedDevice = await prisma.device.update({
-  //       where: { id },
-  //       data: {
-  //         name,
-  //         description,
-  //         property: parsedProperty,
-  //         enabled,
-  //         polling,
-  //       },
-  //     });
-  
-  //     console.log(`Device '${id}' updated in the database.`);
-  
-  //     // Use the deviceManager to handle changes in polling or enabled state
-  //       await deviceManager.handleDeviceUpdated(updatedDevice, prevDevice);
-  
-  //     res.status(200).json(updatedDevice);
-  //   } catch (error) {
-  //     console.error('Error editing device:', error);
-  //     res.status(500).json({ error: 'Failed to edit device' });
-  //   }
-  // };
 
+  
   export const deleteDevice = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
@@ -309,28 +259,6 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
 
 
 
-  // function extractTags(data: any, parentKey = ''): any[] {
-  //   if (Array.isArray(data)) {
-  //     return data.flatMap((item, index) =>
-  //       extractTags(item, `${parentKey}[${index}]`)
-  //     );
-  //   } else if (typeof data === 'object' && data !== null) {
-  //     return Object.keys(data).flatMap((key) =>
-  //       extractTags(data[key], parentKey ? `${parentKey}.${key}` : key)
-  //     );
-  //   } else {
-  //     return [
-  //       {
-  //         name: parentKey, // Use parentKey as the unique name
-  //         type: typeof data,
-  //         value: String(data),
-  //       },
-  //     ];
-  //   }
-  // }
-  
-
-
   function extractTags(data: any, parentKey = ''): any[] {
     if (Array.isArray(data)) {
       return data.flatMap((item, index) =>
@@ -357,6 +285,71 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
   
 
 
+// function extractTags(data: any, parentKey = ''): any[] {
+  //   if (Array.isArray(data)) {
+  //     return data.flatMap((item, index) =>
+  //       extractTags(item, `${parentKey}[${index}]`)
+  //     );
+  //   } else if (typeof data === 'object' && data !== null) {
+  //     return Object.keys(data).flatMap((key) =>
+  //       extractTags(data[key], parentKey ? `${parentKey}.${key}` : key)
+  //     );
+  //   } else {
+  //     return [
+  //       {
+  //         name: parentKey, // Use parentKey as the unique name
+  //         type: typeof data,
+  //         value: String(data),
+  //       },
+  //     ];
+  //   }
+  // }
+  
 
 
-
+ // export const editDeviceAPI = async (req: Request, res: Response): Promise<void> => {
+  //   try {
+  //     const { id } = req.params; // Device ID from URL
+  //     const { name, description, property, enabled, polling } = req.body; // Update fields
+  
+  //     const parsedProperty = JSON.stringify(property);
+    
+  //     // Fetch the previous device details using `id`
+  //     const prevDevice = await prisma.device.findUnique({ where: { id } });
+  //     if (!prevDevice) {
+  //       res.status(404).json({ error: 'Device not found' });
+  //       return;
+  //     }
+  
+  //     // Check for duplicate name only if a new `name` is provided
+  //     if (name && name !== prevDevice.name) {
+  //       const existingDevice = await prisma.device.findUnique({ where: { name } });
+  //       if (existingDevice) {
+  //         console.error('Device with the same name already exists.');
+  //         res.status(400).json({ error: 'Device with the same name already exists' });
+  //         return;
+  //       }
+  //     }
+  
+  //     // Update the device in the database
+  //     const updatedDevice = await prisma.device.update({
+  //       where: { id },
+  //       data: {
+  //         name,
+  //         description,
+  //         property: parsedProperty,
+  //         enabled,
+  //         polling,
+  //       },
+  //     });
+  
+  //     console.log(`Device '${id}' updated in the database.`);
+  
+  //     // Handle changes in polling or enabled state
+  
+  //     res.status(200).json(updatedDevice);
+  //   } catch (error) {
+  //     console.error('Error editing device:', error);
+  //     res.status(500).json({ error: 'Failed to edit device' });
+  //   }
+  // };
