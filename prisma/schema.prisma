@@ -75,18 +75,16 @@ model Item {
   type       String?   // 'widget' or 'symbol'
   name       String?
   property   String?     // JSON field to store properties  
+  address    String?
+  svgGuid    String?
+  label      String?
   events     String?     // JSON field to store events (e.g., actoptions or onclose)
   actions    String?     // JSON field to store actions (e.g., anticlockwise,  range, variableId, bitmask, range, type, and options.) 
-  label      String?
-  stroke     String?
-  x          Float?
-  y          Float?
-  scale      Float?   @default(1.0)
-  rotation   Float?   @default(0.0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now())
   tagId      String?  // Add this field
 
+  variables  Variable[] @relation("ItemVariables") // Relation to Variable
   tag        Tag?     @relation(fields: [tagId], references: [id])
   view       View     @relation(fields: [viewId], references: [id], onDelete: Cascade)
 }
@@ -102,6 +100,7 @@ model Tag {
   deviceId   String
   daq        Daq?
   alarms     Alarm[]  @relation("TagAlarms") // Relation to Alarm
+  variables  Variable[] @relation("TagVariables") // Relation to Variable
 
   items      Item[]
   device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, name: "DeviceTags")
@@ -111,11 +110,18 @@ model Tag {
 
 model Variable {
   id        String   @id @default(uuid()) 
-  name      String
-  type      String
+  name      String?
+  type      String?
   value     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  itemId     String?  // Foreign key for Item
+  item       Item?    @relation("ItemVariables", fields: [itemId], references: [id])
+
+  tagId      String?  // Foreign key for Tag
+  tag        Tag?     @relation("TagVariables", fields: [tagId], references: [id])
+
   daqs      Daq[]    @relation("VariableToDaq") 
 
 }

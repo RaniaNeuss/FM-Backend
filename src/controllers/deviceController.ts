@@ -57,25 +57,116 @@ export const createDeviceAPI = async (req: Request, res: Response): Promise<void
 };
 
 
+// export const createDevice = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     console.log("Incoming request body:", req.body); // Log the payload
+
+//     const { projectId, name, type , description, property, enabled = true, polling = {} } = req.body;
+
+
+  
+
+//     // Check for duplicate device
+//     const existingDevice = await prisma.device.findUnique({ where: { name } });
+//     if (existingDevice) {
+//       console.error("Device with the same name already exists.");
+//       res.status(400).json({ error: 'Device with the same name already exists' });
+//       return;
+//     }
+
+
+//     // Create the device along with its tags, including the value in tags
+//     const newDevice = await prisma.device.create({
+//       data: {
+//         projectId,
+//         name,
+//         type,
+//         description,
+//         property: JSON.stringify(property),
+//         enabled,
+//         polling,
+//         createdAt: new Date(),
+//         updatedAt: new Date(),
+       
+//       },
+//       include: { tags: true }, // Include tags to get their IDs
+//     });
+
+//     // Return the newly created device with its tags
+//     res.status(201).json(newDevice);
+//   } catch (error) {
+//     console.error('Error creating device:', error);
+//     res.status(500).json({ error: 'Failed to create device with dynamic tags' });
+//   }
+// };
+
+
 export const createDevice = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log("Incoming request body:", req.body); // Log the payload
 
-    const { projectId, name, type , description, property, enabled = true, polling = {} } = req.body;
+    const { projectId, name, type, description, property, enabled = true, polling = {} } = req.body;
 
-
-  
+    // Validate common fields
+    if (!name || !projectId) {
+      console.error("Device name or projectId is missing.");
+      res.status(400).json({ error: "Device name and projectId are required" });
+      return;
+    }
 
     // Check for duplicate device
     const existingDevice = await prisma.device.findUnique({ where: { name } });
     if (existingDevice) {
       console.error("Device with the same name already exists.");
-      res.status(400).json({ error: 'Device with the same name already exists' });
+      res.status(400).json({ error: "Device with the same name already exists" });
       return;
     }
 
+    // Handle WebAPI-specific logic
+    if (type === "WebAPI") {
+      console.log("Handling WebAPI device creation logic...");
 
-    // Create the device along with its tags, including the value in tags
+      const { address, method = "GET", format = "JSON" } = property || {};
+      
+      // Validate WebAPI-specific fields
+      if (!address) {
+        console.error("API address is missing in property.");
+        res.status(400).json({ error: "API address is required for WebAPI devices" });
+        return;
+      }
+
+      try {
+        // Fetch data from the address and extract tags
+        const tags = extractTags(await axios({ url: address, method }).then((res) => res.data));
+
+        const newDevice = await prisma.device.create({
+          data: {
+            projectId,
+            name,
+            type,
+            description,
+            property: JSON.stringify(property),
+            enabled,
+            polling,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+           
+          },
+          include: { tags: true }, // Include tags to get their IDs
+        });
+
+        res.status(201).json(newDevice);
+        return;
+      } catch (error) {
+        console.error("Error fetching data from API:",);
+        res.status(500).json({ error: "Failed to fetch data from the API address" });
+        return;
+      }
+    }
+
+    // Handle Generic or other device types
+    console.log("Handling Generic or other device creation logic...");
+
     const newDevice = await prisma.device.create({
       data: {
         projectId,
@@ -87,18 +178,19 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
         polling,
         createdAt: new Date(),
         updatedAt: new Date(),
-       
       },
       include: { tags: true }, // Include tags to get their IDs
     });
 
-    // Return the newly created device with its tags
     res.status(201).json(newDevice);
   } catch (error) {
-    console.error('Error creating device:', error);
-    res.status(500).json({ error: 'Failed to create device with dynamic tags' });
+    console.error("Error creating device:", error);
+    res.status(500).json({ error: "Failed to create device" });
   }
 };
+
+
+
 
 export const saveTagToDevice = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -146,7 +238,7 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
   export const editDevice = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params; 
-      const { name, description, property, enabled, polling } = req.body; 
+      const { name, description, property, enabled, polling ,type } = req.body; 
   
       const parsedProperty = JSON.stringify(property);
     
@@ -173,6 +265,7 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
           description,
           property: parsedProperty,
           enabled,
+          type,
           polling,
         },
       });

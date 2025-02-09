@@ -1,0 +1,37 @@
+{
+  "id": "v_6aab41088-2354",
+  "name": "rania",
+  "profile": {
+    "width": 1024,
+    "height": 768,
+    "bkcolor": "#ffffffff",
+    "margin": 10,
+    "align": "topCenter",
+    "gridType": "fixed"
+  },
+  "items": {
+    "GSE_2d1d79cf-854e4485": {
+      "id": "GSE_2d1d79cf-854e4485",
+      "type": "svg-ext-gauge_semaphore",
+      "name": "lamp",
+      "property": {
+        "events": [],
+        "actions": [],
+        "address": "http://127.0.0.1:1881/_widgets/dynamicSVG/pipe_3d_h1.svg",
+        "ranges": [
+          {
+            "min": 20,
+            "max": 80,
+            "color": "#141313ff",
+            "type": 2,
+            "stroke": "#a70000ff"
+          }
+        ]
+      },
+      "label": "HtmlSemaphore"
+    }
+  },
+  "variables": {},
+  "svgcontent": "<svg width='1024' height='768' xmlns='http://www.w3.org/2000/svg' xmlns:svg='http://www.w3.org/2000/svg'>\n <filter height='200' width='200' y='-3' x='-3' id='blur-filter'>\n  <feGaussianBlur stdDeviation='3'/>\n </filter>\n <g>\n  <title>Layer 1</title>\n  <g xml:space='preserve' font-family='sans-serif' stroke='#000000' font-size='14' fill='#FFFFFF' y='268' x='280' type='svg-ext-gauge_semaphore' id='GSE_2d1d79cf-854e4485'>\n   <ellipse xml:space='preserve' font-family='sans-serif' stroke='#000000' font-size='14' fill='#FFFFFF' ry='14' rx='14' cy='283' cx='295' id='GSE_9647a183-4d4b4a57'/>\n  </g>\n </g>\n</svg>",
+  "type": "svg"
+}

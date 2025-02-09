@@ -253,6 +253,9 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
                         });
                     }
 
+
+
+                    
                     // Create new item if no `itemId` is provided
                     return prisma.item.create({
                         data: {

@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 export const createItem = async (req: Request, res: Response): Promise<void> => {
     try {
         const { viewId } = req.params; // Retrieve viewId from params
-        const { type, name, property, events, actions, label, x, y, scale, rotation, tagId } = req.body;
+        const { type, name, property, events, actions, label,  tagId } = req.body;
 
         // Validate viewId
         if (!viewId) {
@@ -50,10 +50,7 @@ export const createItem = async (req: Request, res: Response): Promise<void> => 
                 events: events ? JSON.stringify(events) : null,
                 actions: actions ? JSON.stringify(actions) : null,
                 label,
-                x,
-                y,
-                scale,
-                rotation,
+              
                 tagId,
             },
         });
@@ -149,7 +146,7 @@ export const getItemById = async (req: Request, res: Response): Promise<void> =>
 export const updateItem = async (req: Request, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
-        const { type, name, property,events,actions, label, x, y, scale, rotation, tagId } = req.body;
+        const { type, name, property,events,actions, label, tagId } = req.body;
         const updatedItem = await prisma.item.update({
             where: { id },
             data: {
@@ -159,10 +156,6 @@ export const updateItem = async (req: Request, res: Response): Promise<void> => 
                 events: JSON.stringify(events),
                 actions: JSON.stringify(actions),
                 label,
-                x,
-                y,
-                scale,
-                rotation,
                 tagId
             }
         });
