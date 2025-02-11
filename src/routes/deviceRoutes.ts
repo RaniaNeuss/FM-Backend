@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import {
-    createDevice,createDeviceAPI,
-     editDevice,deleteDevice,getDeviceById,getAllDevices,saveTagToDevice
+    createDevice,
+     editDevice,deleteDevice,getDeviceById,getAllDevices,saveTagToDevice,setTankLevel
 } from '../controllers/deviceController';
 
 const router = Router();
 
 // Create a new device
 router.post('/create', createDevice); // POST /api/devices/create
-router.post('/createapi', createDeviceAPI); // POST /api/devices/create
+router.post('/tank/:tankId', setTankLevel);
 // Edit an existing device
  router.put('/:id', editDevice); // PUT /api/devices/edit/:id
 // 

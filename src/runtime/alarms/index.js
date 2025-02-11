@@ -121,24 +121,7 @@ function AlarmsManager(_runtime) {
                     var result = { highhigh: 0, high: 0, low: 0, info: 0, actions: [] };
                     if (alrs) {
                         Object.values(alrs).forEach(alr => {
-                            // Increment the count for the alarm type
                             result[alr.type]++;
-    
-                            // Check if the alarm type is ACTION and `offtime` is not set
-                            if (alr.type === AlarmsTypes.ACTION && !alr.offtime) {
-                                // Parse `subproperty` if it's a JSON string
-                                const subproperty = alr.subproperty
-                                    ? JSON.parse(alr.subproperty)
-                                    : null;
-    
-                                // Handle specific action types
-                                if (subproperty?.type === ActionsTypes.POPUP || subproperty?.type === ActionsTypes.SET_VIEW) {
-                                    result.actions.push({ 
-                                        type: subproperty.type, 
-                                        params: subproperty.actparam 
-                                    });
-                                }
-                            }
                         });
                     }
                     resolve(result);
@@ -148,6 +131,7 @@ function AlarmsManager(_runtime) {
                 });
         });
     };
+    
     
 
     /**
@@ -220,97 +204,73 @@ function AlarmsManager(_runtime) {
     /**
      * Return the alarms history
      */
-    this.getAlarmsHistory = function (query, permission) {
-        return new Promise(function (resolve, reject) {
-            var history = [];
-            alarmstorage.getAlarmsHistory(query.start, query.end).then(result => {
-                for (var i = 0; i < result.length; i++) {
-                    var alr = new AlarmHistory(result[i].alarmId); //Replace nametype: If nametype is not defined in your schema or alarmstorage, replace it with alarmId.
-                    alr.status = result[i].status;
-                    alr.text = result[i].text;
-                    alr.ontime = result[i].ontime;
-                    alr.offtime = result[i].offtime;
-                    alr.acktime = result[i].acktime;
-                    alr.userack = result[i].userack;
-                    alr.group = result[i].grp;
-                    if (alr.ontime) {
-                        var alrPermission = { show: true, enabled: true };
-                        if (alarmsProperty[alr.name]) {
-                            alrPermission = runtime.checkPermission(permission, alarmsProperty[alr.name].property);
-                        }
-                        if (alrPermission.show) {
-                            history.push(alr);
-                        }
-                    }
-                    // add action or defined colors
-                    if (alr.type === AlarmsTypes.ACTION) {
-                        alr.text = `${alr.name}`;
-                        alr.group = `Actions`;
-                    } else if (alarmsProperty[alr.name] && alarmsProperty[alr.name][alr.type]) {
-                        alr.bkcolor = alarmsProperty[alr.name][alr.type].bkcolor;
-                        alr.color = alarmsProperty[alr.name][alr.type].color;
-                    }
-                }
-                resolve(history);
-            }).catch(function (err) {
-                logger.error('alarms.load-current.failed: ' + err);
-                reject(err);
-            });
-        });
-    }
-
+    // this.getAlarmsHistory = function (query, permission) {
+    //     return new Promise(function (resolve, reject) {
+    //         var history = [];
+    //         alarmstorage.getAlarmsHistory(query.start, query.end).then(result => {
+    //             for (var i = 0; i < result.length; i++) {
+    //                 var alr = new AlarmHistory(result[i].alarmId); //Replace nametype: If nametype is not defined in your schema or alarmstorage, replace it with alarmId.
+    //                 alr.status = result[i].status;
+    //                 alr.text = result[i].text;
+    //                 alr.ontime = result[i].ontime;
+    //                 alr.offtime = result[i].offtime;
+    //                 alr.acktime = result[i].acktime;
+    //                 alr.userack = result[i].userack;
+    //                 alr.group = result[i].grp;
+    //                 if (alr.ontime) {
+    //                     var alrPermission = { show: true, enabled: true };
+    //                     if (alarmsProperty[alr.name]) {
+    //                         alrPermission = runtime.checkPermission(permission, alarmsProperty[alr.name].property);
+    //                     }
+    //                     if (alrPermission.show) {
+    //                         history.push(alr);
+    //                     }
+    //                 }
+    //                 // add action or defined colors
+    //                 if (alr.type === AlarmsTypes.ACTION) {
+    //                     alr.text = `${alr.name}`;
+    //                     alr.group = `Actions`;
+    //                 } else if (alarmsProperty[alr.name] && alarmsProperty[alr.name][alr.type]) {
+    //                     alr.bkcolor = alarmsProperty[alr.name][alr.type].bkcolor;
+    //                     alr.color = alarmsProperty[alr.name][alr.type].color;
+    //                 }
+    //             }
+    //             resolve(history);
+    //         }).catch(function (err) {
+    //             logger.error('alarms.load-current.failed: ' + err);
+    //             reject(err);
+    //         });
+    //     });
+    // }
+    this.getAlarmsHistory = async function (from, to) {
+        try {
+            return await alarmstorage.getAlarmsHistory(from, to);
+        } catch (err) {
+            throw new Error('Failed to fetch alarm history: ' + err.message);
+        }
+    };
+    
     /**
      * Set Ack to alarm
      * @param {*} alarmName
      * @returns
      */
-    this.setAlarmAck = function (alarmName, userId, permission) {
-        return new Promise(function (resolve, reject) {
-            var changed = [];
-            var authError = false;
-            Object.keys(alarms).forEach(alrkey => {
-                alarms[alrkey].forEach(alr => {
-                    if (alarmName === null || alr.getId() === alarmName) {
-                        var alrPermission = { show: true, enabled: true };
-                        if (alarmsProperty[alr.name]) {
-                            alrPermission = runtime.checkPermission(permission, alr.tagproperty);
-                        }
-                        if (alrPermission.enabled) {
-                            if (alr.isToAck() > 0) {
-                                alr.setAck(userId);
-                                changed.push(alr);
-                            }
-                        } else {
-                            authError = true;
-                        }
-                    }
-                });
-            });
-            if (authError) {
-                reject({code: 401, error:"unauthorized_error", message: "Unauthorized!"});
-            } else {
-                if (changed.length) {
-                    alarmstorage.setAlarms(changed).then(function (result) {
-                        resolve(true);
-                    }).catch(function (err) {
-                        reject(err);
-                    });
-                } else {
-                    resolve(false);
-                }
-            }
-        });
-    }
+    this.setAlarmAck = async function (alarmId, userId) {
+        try {
+            return await alarmstorage.setAlarmAck(alarmId, userId);
+        } catch (err) {
+            throw new Error('Failed to acknowledge alarm: ' + err.message);
+        }
+    };
 
-    this.clearAlarms = function (all) {
-        return new Promise(function (resolve, reject) {
-            alarmstorage.clearAlarms(all).then((result) => {
-                resolve(true);
-            }).catch(function (err) {
-                reject(err);
-            });
-        });
-    }
+    this.clearAlarms = async function (all) {
+        try {
+            return await alarmstorage.clearAlarms(all);
+        } catch (err) {
+            throw new Error('Failed to clear alarms: ' + err.message);
+        }
+    };
+    
 
     /**
      * Clear Alarm history

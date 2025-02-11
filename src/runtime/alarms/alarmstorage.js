@@ -57,7 +57,7 @@ export async function setAlarmAck(alarmId, userId) {
     }
 
     // Update the alarm with the username in `userAck`
-    const result = await prisma.alarm.updateMany({
+    const result = await prisma.alarmHistory.updateMany({
       where: {
         id: alarmId,
         acktime: null, // Only check for null values

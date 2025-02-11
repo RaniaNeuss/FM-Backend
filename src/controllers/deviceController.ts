@@ -7,98 +7,8 @@ import axios from 'axios'; // Ensure this is at the top
 
 
 
-export const createDeviceAPI = async (req: Request, res: Response): Promise<void> => {
-  try {
-    console.log("Incoming request body:", req.body); // Log the payload
-
-    const { projectId, name, type = 'WebAPI', description, property, enabled = true, polling = {} } = req.body;
-    const { address, method = 'GET', format = 'JSON' } = property || {};
-
-    // Validate address
-    if (!address) {
-      console.error("API address is missing in property.");
-      res.status(400).json({ error: 'API address is required' });
-      return;
-    }
-
-    // Check for duplicate device
-    const existingDevice = await prisma.device.findUnique({ where: { name } });
-    if (existingDevice) {
-      console.error("Device with the same name already exists.");
-      res.status(400).json({ error: 'Device with the same name already exists' });
-      return;
-    }
-
-    // Extract tags from the API response
-    const tags = extractTags(await axios({ url: address, method }).then((res) => res.data));
-
-    const newDevice = await prisma.device.create({
-      data: {
-        projectId,
-        name,
-        type,
-        description,
-        property: JSON.stringify(property),
-        enabled,
-        polling,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-       
-      },
-      include: { tags: true },
-    });
-
-    // Return the newly created device with its tags
-    res.status(201).json(newDevice);
-  } catch (error) {
-    console.error('Error creating device:', error);
-    res.status(500).json({ error: 'Failed to create device with dynamic tags' });
-  }
-};
 
 
-// export const createDevice = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     console.log("Incoming request body:", req.body); // Log the payload
-
-//     const { projectId, name, type , description, property, enabled = true, polling = {} } = req.body;
-
-
-  
-
-//     // Check for duplicate device
-//     const existingDevice = await prisma.device.findUnique({ where: { name } });
-//     if (existingDevice) {
-//       console.error("Device with the same name already exists.");
-//       res.status(400).json({ error: 'Device with the same name already exists' });
-//       return;
-//     }
-
-
-//     // Create the device along with its tags, including the value in tags
-//     const newDevice = await prisma.device.create({
-//       data: {
-//         projectId,
-//         name,
-//         type,
-//         description,
-//         property: JSON.stringify(property),
-//         enabled,
-//         polling,
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-       
-//       },
-//       include: { tags: true }, // Include tags to get their IDs
-//     });
-
-//     // Return the newly created device with its tags
-//     res.status(201).json(newDevice);
-//   } catch (error) {
-//     console.error('Error creating device:', error);
-//     res.status(500).json({ error: 'Failed to create device with dynamic tags' });
-//   }
-// };
 
 
 export const createDevice = async (req: Request, res: Response): Promise<void> => {
@@ -349,6 +259,74 @@ export const saveTagToDevice = async (req: Request, res: Response): Promise<void
     }
   };
   
+
+
+
+
+
+  export const setTankLevel = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { tankId } = req.params;
+        const { name, percentage } = req.body;
+
+        if (!tankId || !name || percentage === undefined) {
+            res.status(400).json({ error: "validation_error", message: "Tank ID, tag name, and percentage are required." });
+            return;
+        }
+
+        // Check if the tank (device) exists
+        const device = await prisma.device.findUnique({
+            where: { id: tankId },
+        });
+
+        if (!device) {
+            res.status(404).json({ error: "not_found", message: "Tank (device) does not exist." });
+            return;
+        }
+
+        // Check if the tag already exists
+        let tag = await prisma.tag.findFirst({
+            where: { name, deviceId: tankId },
+        });
+
+        if (tag) {
+            // Update the existing tag
+            tag = await prisma.tag.update({
+                where: { id: tag.id },
+                data: {
+                    value: percentage.toString(),
+                    type: "number",
+                    updatedAt: new Date(),
+                },
+            });
+        } else {
+            // Create a new tag if it doesn’t exist
+            tag = await prisma.tag.create({
+                data: {
+                    name,
+                    value: percentage.toString(),
+                    type: "number",
+                    deviceId: tankId, // Ensures foreign key is correct
+                },
+            });
+        }
+
+        res.status(200).json({
+            message: "Tank level updated successfully.",
+            tag,
+        });
+    } catch (err: any) {
+        console.error(`Failed to set tank level for tank ID: ${req.params.tankId}: ${err.message}`);
+        res.status(500).json({ error: "unexpected_error", message: "An error occurred while updating tank level." });
+    }
+};
+
+
+
+
+
+
+
 
 
 

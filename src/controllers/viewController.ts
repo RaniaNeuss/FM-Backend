@@ -126,16 +126,18 @@ export const getAllViews = async (req: Request, res: Response): Promise<void> =>
 
 export const getViewById = async (req: Request, res: Response): Promise<void> => {
     try {
-          // Debug: Log session details
-       console.log('Session Data:', req.session);
+        // Debug: Log session details
+        console.log('Session Data:', req.session);
 
-       // Retrieve userId from session
-       const userId = req.userId; 
+        // Retrieve userId from session
+        const userId = req.userId;
 
-    //    if (!userId) {
-    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-    //        return;
-    //    }
+        // const userId = req.userId; // Ensure user authentication if needed
+        // if (!userId) {
+        //     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+        //     return;
+        // }
+
         const { projectId, id } = req.params; // Retrieve projectId and viewId from params
 
         // Validate required fields
@@ -149,9 +151,7 @@ export const getViewById = async (req: Request, res: Response): Promise<void> =>
 
         // Check if the project exists
         const existingProject = await prisma.project.findFirst({
-            where: {
-                id: projectId,
-            },
+            where: { id: projectId },
         });
 
         if (!existingProject) {
@@ -159,14 +159,19 @@ export const getViewById = async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
-        // Fetch the view using the view ID and project ID
+        // Fetch the view along with items and variables
         const view = await prisma.view.findFirst({
             where: {
                 id: id,
                 projectId: projectId,
             },
             include: {
-                items: true, // Include related items
+                items: {
+                    include: {
+                        variables: true, // Include variables for each item
+                        tag: true, // Include tag details if needed
+                    },
+                },
                 project: true, // Include project details
             },
         });

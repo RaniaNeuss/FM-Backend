@@ -44,6 +44,7 @@ model User {
   projects  Project[]       @relation("ProjectToUser")
   groups    Group[]   @relation("UserGroups")
   alarms    Alarm[]         @relation("AlarmAcknowledgements") // Fixed relation to Alarm model
+  alarmHistories AlarmHistory[]   @relation("AlarmHistoryAcknowledgements")
 }
 
 
@@ -128,18 +129,45 @@ model Variable {
 
 
 
-model Daq {
-  id        String   @id @default(uuid())
-  enabled   Boolean
-  timestamp DateTime @default(now())
-  value     String
-  interval  Int
-  changed   Boolean
-  restored  Boolean
-  variableId String
-  variable  Variable @relation(fields: [variableId], references: [id], name: "VariableToDaq")
-  tagId     String   @unique
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+model Alarm {
+  id             String         @id @default(uuid())
+  projectId      String
+  status         String?
+  name           String? 
+  text           String? 
+  type           String?
+  tagId          String         // Foreign key to associate with a Tag
+  min            Float?         // Minimum threshold for the alarm
+  max            Float?         // Maximum threshold for the alarm
+  interval       Int?           // Interval in seconds
+  timeInMinMaxRange Int?
+  actions        String?
+  isEnabled      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  project        Project        @relation(fields: [projectId], references: [id])
+  tag            Tag            @relation(fields: [tagId], references: [id], name: "TagAlarms") // Relation to Tag
+  alarmHistories AlarmHistory[]
+  users          User[]         @relation("AlarmAcknowledgements")
+}
+
+model AlarmHistory {
+  id        String    @id @default(uuid())
+  alarmId   String
+  type      String?
+  status    String?
+  message   String?
+  group     String?  // Group associated with the alarm history
+  text      String?  // Additional details or description
+  onTime    DateTime?
+  offTime   DateTime?
+  ackTime   DateTime?
+  userAck   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  alarm     Alarm     @relation(fields: [alarmId], references: [id])
+  users          User[]         @relation("AlarmHistoryAcknowledgements")
+
 }
 
 model Device {
@@ -167,58 +195,9 @@ model DeviceSecurity {
   device   Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 }
 
-model Alarm {
-  id             String         @id @default(uuid())
-  projectId      String
-  status         String?
-  name           String? 
-  text           String? 
-  type           String?
-  subproperty    String?
-  tagId          String         // Foreign key to associate with a Tag
-  min            Float?         // Minimum threshold for the alarm
-  max            Float?         // Maximum threshold for the alarm
-  interval       Int?           // Interval in seconds
-  actions        String?
-  isEnabled      Boolean        @default(false)
-  ontime         DateTime?
-  offtime        DateTime?
-  acktime        DateTime?
-  userAck        String?
-  lastCheck      DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  project        Project        @relation(fields: [projectId], references: [id])
-  tag            Tag            @relation(fields: [tagId], references: [id], name: "TagAlarms") // Relation to Tag
-  alarmHistories AlarmHistory[]
-  users          User[]         @relation("AlarmAcknowledgements")
-}
 
-model AlarmHistory {
-  id        String    @id @default(uuid())
-  alarmId   String
-  type      String?
-  status    String?
-  message   String?
-  group     String?  // Group associated with the alarm history
-  text      String?  // Additional details or description
-  onTime    DateTime?
-  offTime   DateTime?
-  ackTime   DateTime?
-  userAck   String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  alarm     Alarm     @relation(fields: [alarmId], references: [id])
-}
 
-model Event {
-  id          String   @id @default(uuid())
-  projectId   String
-  type        String
-  description String
-  createdAt   DateTime @default(now())
-  project     Project  @relation(fields: [projectId], references: [id])
-}
+
 
 model Group {
   id       String  @id @default(uuid())
@@ -227,17 +206,6 @@ model Group {
 
 }
 
-model Settings {
-  id                   String   @id @default(uuid())
-  system               String?
-  smtp                 String?
-  daqstore             String?
-  alarms               String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  project              Project  @relation("ProjectSettings", fields: [projectId], references: [id], onDelete: Cascade)
-  projectId            String   @unique
-}
 
 
 
@@ -257,6 +225,27 @@ model Notification {
     project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade) // Add this line to establish the relationship
 
 }
+
+
+
+
+
+model Settings {
+  id                   String   @id @default(uuid())
+  system               String?
+  form                 String?
+  smtp                 String?
+  daqstore             String?
+  alarms               String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  project              Project  @relation("ProjectSettings", fields: [projectId], references: [id], onDelete: Cascade)
+  projectId            String   @unique
+}
+
+
+
+
 
 model Report {
   id          String   @id @default(uuid())
@@ -300,4 +289,36 @@ model General {
   id    String @id @default(uuid())
   name  String @unique
   value String
+}
+
+
+
+
+model Daq {
+  id        String   @id @default(uuid())
+  enabled   Boolean
+  timestamp DateTime @default(now())
+  value     String
+  interval  Int
+  changed   Boolean
+  restored  Boolean
+  variableId String
+  variable  Variable @relation(fields: [variableId], references: [id], name: "VariableToDaq")
+  tagId     String   @unique
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+
+
+
+model Event {
+  id          String   @id @default(uuid())
+  projectId   String
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id])
 }

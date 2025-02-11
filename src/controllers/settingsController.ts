@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 // Create Settings
 export const createSettings = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { system, smtp, daqstore, alarms } = req.body; // Extract settings data from request body
+        const {form } = req.body; // Extract settings data from request body
         const { projectId } = req.params; // Get projectId from params
         const userId = req.userId;
         if (!userId  ) {
@@ -40,10 +40,8 @@ export const createSettings = async (req: Request, res: Response): Promise<void>
         const newSettings = await prisma.settings.create({
             data: {
                 projectId,
-                system: JSON.stringify(system || {}),
-                smtp: JSON.stringify(smtp || {}),
-                daqstore: JSON.stringify(daqstore || {}),
-                alarms: JSON.stringify(alarms || {}),
+                form: JSON.stringify(form),
+               
             }
         });
 

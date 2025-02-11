@@ -10,12 +10,11 @@ import { getAlarmsHistory } from '../runtime/alarms/alarmstorage';
 //set alarm
 
 
-export const setAlarms = async (req: Request, res: Response): Promise<void> => {
+export const setAlarm = async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const alarms = req.body;
+    const alarm = req.body;
 
-    // Validate projectId and alarms array
     if (!projectId) {
       res.status(400).json({
         error: "validation_error",
@@ -23,116 +22,103 @@ export const setAlarms = async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    if (!alarms || !Array.isArray(alarms)) {
-       res.status(400).json({
+    if (!alarm || typeof alarm !== "object") {
+      res.status(400).json({
         error: "validation_error",
-        message: "Expected an array of alarms in the request body.",
+        message: "Expected an object containing alarm data in the request body.",
       });
     }
 
-    console.log("Processing alarms for projectId:", projectId);
+    console.log("Processing alarm for projectId:", projectId);
 
-    for (const alarm of alarms) {
-      // Validate required fields
-      const { id, type, tagId, min, max, interval, userAck, groupId, ontime, offtime, acktime, status } = alarm;
+    const { id, name,text, type, tagId, min, max, interval, timeInMinMaxRange, status } = alarm;
 
-      if (!type || !tagId || min == null || max == null || !interval) {
-        console.warn(
-          `Alarm validation failed: Missing required fields for alarm ${
-            id || "new"
-          }`
-        );
-        continue;
-      }
-
-      // Check if the tag exists
-      const tag = await prisma.tag.findUnique({ where: { id: tagId } });
-      if (!tag) {
-        console.warn(
-          `Tag with id ${tagId} not found. Skipping alarm ${id || "new"}.`
-        );
-        continue;
-      }
-
-      // Check if the group exists, if provided
-      if (groupId) {
-        const group = await prisma.group.findUnique({ where: { id: groupId } });
-        if (!group) {
-          console.warn(
-            `Group with id ${groupId} not found. Skipping alarm ${id || "new"}.`
-          );
-          continue;
-        }
-      }
-
-      // Check if the user exists based on the `username`, if provided
-      let user = null;
-      if (userAck) {
-        user = await prisma.user.findUnique({
-          where: { username: userAck },
-        });
-        if (!user) {
-          console.warn(
-            `User with username "${userAck}" not found. Skipping alarm ${
-              id || "new"
-            }.`
-          );
-          continue;
-        }
-      }
-
-      // Upsert the alarm (basic data)
-      const upsertedAlarm = await prisma.alarm.upsert({
-        where: { id: id || "" },
-        create: {
-          name: alarm.name,
-          type,
-          tag: { connect: { id: tagId } }, // Associate the alarm with the tag
-          min,
-          max,
-          interval,
-          isEnabled: alarm.isEnabled || false,
-          project: { connect: { id: projectId } },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        update: {
-          name: alarm.name,
-          type,
-          tagId,
-          min,
-          max,
-          interval,
-          isEnabled: alarm.isEnabled || false,
-          updatedAt: new Date(),
-        },
+    if (!type || !tagId || min == null || max == null || !interval) {
+      res.status(400).json({
+        error: "validation_error",
+        message: "Missing required fields: type, tagId, min, max, interval are mandatory.",
       });
-
-      console.log(`Alarm ${upsertedAlarm.id} upserted successfully.`);
-
-      // Insert into alarm history
-      await prisma.alarmHistory.create({
-        data: {
-          alarmId: upsertedAlarm.id,
-          type,
-          status: status || "inactive",
-          group: groupId || "", // Associate the group ID if provided
-          text: alarm.message || "",
-          onTime: ontime || null,
-          offTime: offtime || null,
-          ackTime: acktime || null,
-          userAck: user ? user.username : "", // Save the username of the user
-          createdAt: new Date(), // Use current time for history creation
-        },
-      });
-
-      console.log(`History for alarm ${upsertedAlarm.id} created successfully.`);
     }
+
+    // Check if the tag exists
+    const tag = await prisma.tag.findUnique({ where: { id: tagId } });
+    if (!tag) {
+     res.status(400).json({
+        error: "validation_error",
+        message: `Tag with id ${tagId} not found.`,
+      });
+    }
+
+    // 🔹 Fetch all users that belong to groups "SuperAdmin" or "Editor"
+    const users = await prisma.user.findMany({
+      where: {
+        groups: {
+          some: {
+            name: { in: ["SuperAdmin", "Editor"] } // Only fetch users in these groups
+          }
+        }
+      },
+      select: { id: true } // Only fetch user IDs
+    });
+
+    if (users.length === 0) {
+      res.status(400).json({
+        error: "validation_error",
+        message: "No users found in groups 'SuperAdmin' or 'Editor'.",
+      });
+    }
+
+    // Extract user IDs
+    const userIds = users.map(user => ({ id: user.id }));
+
+    // 🔹 Upsert the alarm and associate with users
+    const upsertedAlarm = await prisma.alarm.upsert({
+      where: id ? { id } : { id: "non-existent-id" },
+      create: {
+        name,
+        type,
+        text,
+        tag: { connect: { id: tagId } },
+        min,
+        max,
+        interval,
+        timeInMinMaxRange: timeInMinMaxRange || 0, // Include new field
+        isEnabled: alarm.isEnabled || false,
+        project: { connect: { id: projectId } },
+        users: { connect: userIds } // Connect users to the alarm
+      },
+      update: {
+        name,
+        type,
+        tagId,
+        min,
+        max,
+        interval,
+        timeInMinMaxRange: timeInMinMaxRange || 0, // Include new field
+        isEnabled: alarm.isEnabled || false,
+        users: { set: userIds } // Update the associated users
+      },
+    });
+
+    console.log(`Alarm ${upsertedAlarm.id} upserted successfully.`);
+
+    // 🔹 Insert into alarm history
+    await prisma.alarmHistory.create({
+      data: {
+        alarmId: upsertedAlarm.id,
+        type,
+        status: status || "inactive",
+        text: alarm.text || "",
+      },
+    });
+
+    console.log(`History for alarm ${upsertedAlarm.id} created successfully.`);
 
     res.status(200).json({
       success: true,
-      message: "Alarms processed successfully.",
+      message: "Alarm processed successfully.",
     });
+
   } catch (err: any) {
     console.error(`Error setting alarm: ${err.message}`);
     res.status(500).json({
@@ -141,6 +127,7 @@ export const setAlarms = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
+
 
   
 
@@ -155,17 +142,15 @@ export const setAlarms = async (req: Request, res: Response): Promise<void> => {
 export const acknowledgeAlarm = async (req: Request, res: Response): Promise<void> => {
     try {
         const { alarmId } = req.body;
-        const userId = req.session.userId;
+        const userId = req.userId;
 
-        // Validate userId
+
         if (!userId) {
-            res.status(400).json({
-                error: 'user_not_found',
-                message: 'User not found. Please log in to acknowledge alarms.',
-            });
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
             return;
         }
-
+      
+    
         // Validate alarmId
         if (!alarmId) {
             res.status(400).json({
