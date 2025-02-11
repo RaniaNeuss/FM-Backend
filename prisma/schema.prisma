@@ -134,17 +134,20 @@ model Alarm {
   projectId      String
   status         String?
   name           String? 
-  text           String? 
   type           String?
   tagId          String         // Foreign key to associate with a Tag
-  min            Float?         // Minimum threshold for the alarm
-  max            Float?         // Maximum threshold for the alarm
-  interval       Int?           // Interval in seconds
-  timeInMinMaxRange Int?
-  actions        String?
+  subproperty     String?
+  onTime          DateTime?
+  offTime         DateTime?
+  ackTime          DateTime?
+
+
+
   isEnabled      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  
   project        Project        @relation(fields: [projectId], references: [id])
   tag            Tag            @relation(fields: [tagId], references: [id], name: "TagAlarms") // Relation to Tag
   alarmHistories AlarmHistory[]

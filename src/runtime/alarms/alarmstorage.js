@@ -182,7 +182,6 @@ export async function setAlarms(alarms) {
           type: alr.type,
           status: status,
           text: alr.subproperty?.text || '',
-          group: alr.subproperty?.group || '',
           onTime: alr.ontime,
           offTime: alr.offtime,
           ackTime: alr.acktime,
