@@ -3,20 +3,40 @@ import { EventEmitter } from "events";
 
 const prisma = new PrismaClient();
 
-// Enum for Alarm Status
+// ✅ Using same constant names from runtime
 enum AlarmStatusEnum {
+    VOID = "",
+    ON = "N",
+    OFF = "NF",
+    ACK = "NA",
+}
+
+enum AlarmsStatusEnum {
     INIT = "init",
     LOAD = "load",
     IDLE = "idle",
 }
 
-// Enum for Alarm Types
 enum AlarmsTypes {
     HIGH_HIGH = "highhigh",
     HIGH = "high",
     LOW = "low",
     INFO = "info",
     ACTION = "action",
+}
+
+enum AlarmAckModeEnum {
+    FLOAT = "float",
+    ACK_ACTIVE = "ackactive",
+    ACK_PASSIVE = "ackpassive",
+}
+
+enum ActionsTypes {
+    POPUP = "popup",
+    SET_VALUE = "setValue",
+    SET_VIEW = "setView",
+    SEND_MSG = "sendMsg",
+    RUN_SCRIPT = "runScript",
 }
 
 // Define the Alarm class
@@ -47,7 +67,7 @@ class Alarm {
         this.type = type;
         this.subproperty = subproperty ? JSON.parse(subproperty) : {};
         this.tagproperty = tagproperty ? JSON.parse(tagproperty) : {};
-        this.status = status || AlarmStatusEnum.INIT;
+        this.status = status || AlarmStatusEnum.VOID;
         this.ontime = 0;
         this.offtime = 0;
         this.acktime = 0;
@@ -71,9 +91,9 @@ class Alarm {
 class AlarmsManager {
     runtime: any;
     alarms: { [key: string]: Alarm[] } = {};
-    status: AlarmStatusEnum = AlarmStatusEnum.INIT;
+    status: AlarmsStatusEnum = AlarmsStatusEnum.INIT;
     events: EventEmitter;
-    
+
     constructor(runtime: any) {
         this.runtime = runtime;
         this.events = new EventEmitter();
@@ -81,26 +101,32 @@ class AlarmsManager {
 
     // Start monitoring alarms
     start(): void {
+        console.log("🔄 Starting Alarm Manager...");
         setInterval(() => {
+            console.log("🔍 Checking alarm status...");
             this.checkStatus();
-        }, 1000);
+        }, 5000); // Runs every 5 seconds for debugging
     }
 
     // Check the status of alarms
-    private checkStatus(): void {
-        if (this.status === AlarmStatusEnum.INIT) {
-            this.loadAlarms();
-        } else if (this.status === AlarmStatusEnum.IDLE) {
-            this.processAlarms();
+    private async checkStatus(): Promise<void> {
+        console.log(`📌 Current alarm manager state: ${this.status}`);
+
+        if (this.status === AlarmsStatusEnum.INIT) {
+            console.log("⏳ Loading alarms into memory...");
+            await this.loadAlarms();
+        } else if (this.status === AlarmsStatusEnum.IDLE) {
+            console.log("🛠️ Processing alarms...");
+            await this.processAlarms();
         }
     }
 
     // Load alarms into memory
     private async loadAlarms() {
         try {
-            this.status = AlarmStatusEnum.LOAD;
+            this.status = AlarmsStatusEnum.LOAD;
 
-            // Fetch alarms with related `Tag`
+            console.log("📡 Fetching alarms from the database...");
             const alarmsFromDB = await prisma.alarm.findMany({
                 include: {
                     tag: true, // Fetch related tag details
@@ -119,40 +145,38 @@ class AlarmsManager {
 
                 if (!acc[alarm.name]) acc[alarm.name] = [];
                 acc[alarm.name].push(parsedAlarm);
-
                 return acc;
             }, {});
 
-            this.status = AlarmStatusEnum.IDLE;
+            console.log(`✅ Loaded ${alarmsFromDB.length} alarms into memory.`);
+            this.status = AlarmsStatusEnum.IDLE;
         } catch (error) {
-            console.error("Failed to load alarms:", error);
+            console.error("❌ Failed to load alarms:", error);
         }
     }
 
     // Process alarm conditions
     private async processAlarms() {
+        console.log("🔄 Checking alarms for status updates...");
         for (const key in this.alarms) {
             this.alarms[key].forEach(async (alarm) => {
-                if (alarm.status === AlarmStatusEnum.IDLE) {
-                    console.log(`Processing alarm: ${alarm.name}`);
+                console.log(`🔍 Processing alarm: ${alarm.name} | Status: ${alarm.status}`);
 
-                    // Fetch current tag value
-                    const tagValue = parseFloat(alarm.tagproperty.value || "0");
-                    const minThreshold = alarm.subproperty.min;
-                    const maxThreshold = alarm.subproperty.max;
+                // Fetch current tag value
+                const tagValue = parseFloat(alarm.tagproperty.value || "0");
+                const minThreshold = alarm.subproperty.min;
+                const maxThreshold = alarm.subproperty.max;
 
-                    // Trigger alarm if value is out of range
-                    if (tagValue < minThreshold || tagValue > maxThreshold) {
-                        console.log(`⚠️ Alarm Triggered: ${alarm.name}`);
+                if (tagValue >= minThreshold && tagValue <= maxThreshold) {
+                    console.log(`🚨 Alarm Triggered: ${alarm.name} (Value: ${tagValue})`);
 
-                        // Update alarm status in DB
-                        await prisma.alarm.update({
-                            where: { id: alarm.id },
-                            data: { status: "triggered", onTime: new Date() },
-                        });
+                    // Update alarm status in DB
+                    await prisma.alarm.update({
+                        where: { id: alarm.id },
+                        data: { status: AlarmStatusEnum.ON, onTime: new Date() },
+                    });
 
-                        this.events.emit("alarmTriggered", alarm);
-                    }
+                    this.events.emit("alarmTriggered", alarm);
                 }
             });
         }
@@ -160,11 +184,13 @@ class AlarmsManager {
 
     // Get all active alarms
     async getActiveAlarms() {
+        console.log("📡 Fetching active alarms...");
         const alarms = await prisma.alarm.findMany({
-            where: { status: "triggered" },
+            where: { status: AlarmStatusEnum.ON },
             include: { tag: true },
         });
 
+        console.log(`✅ Found ${alarms.length} active alarms.`);
         return alarms.map((alarm) => ({
             ...alarm,
             subproperty: alarm.subproperty ? JSON.parse(alarm.subproperty) : {},
@@ -175,17 +201,17 @@ class AlarmsManager {
     // Acknowledge an alarm
     async acknowledgeAlarm(alarmId: string, userId: string) {
         try {
+            console.log(`📝 Acknowledging alarm: ${alarmId} by user ${userId}`);
             return await prisma.alarm.update({
                 where: { id: alarmId },
-                data: { ackTime: new Date(), status: "acknowledged" },
+                data: { ackTime: new Date(), status: AlarmStatusEnum.ACK },
             });
         } catch (err) {
+            console.error(`❌ Failed to acknowledge alarm: ${err}`);
             throw new Error(`Failed to acknowledge alarm: ${err}`);
         }
-    }
+    }   
 }
 
-export default AlarmsManager;
-
-
-
+const alarmManager = new AlarmsManager({});
+export default alarmManager;

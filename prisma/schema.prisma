@@ -52,7 +52,7 @@ model User {
 
 model View {
   id                String   @id @default(uuid())
-  name             String  @unique
+  name             String  
   projectId        String
   description      String?
   width            Int?
@@ -168,7 +168,7 @@ model AlarmHistory {
   userAck   String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  alarm     Alarm     @relation(fields: [alarmId], references: [id])
+  alarm     Alarm     @relation(fields: [alarmId], references: [id] ,onDelete: Cascade)
   users          User[]         @relation("AlarmHistoryAcknowledgements")
 
 }
