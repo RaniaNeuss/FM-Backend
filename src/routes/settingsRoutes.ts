@@ -20,7 +20,7 @@ router.get('/:projectId',authenticateUser, getAllSettings); // GET /api/settings
 router.get('/:projectId/:id',authenticateUser, getSettingsById); // GET /api/settings/:projectId/:id
 
 // Update settings by ID for a project
-router.put('/:projectId/:id',authenticateUser, updateSettings); // PUT /api/settings/:projectId/:id
+router.put('/:projectId',authenticateUser, updateSettings); // PUT /api/settings/:projectId/:id
 
 // Delete settings by ID for a project
 router.delete('/:projectId/:id',authenticateUser, deleteSettings); // DELETE /api/settings/:projectId/:id

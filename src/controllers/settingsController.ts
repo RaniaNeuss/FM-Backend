@@ -141,9 +141,8 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
             });
             return;
         }
-        const { projectId, id } = req.params;
-        const { system, smtp, daqstore, alarms } = req.body;
-
+        const { projectId } = req.params;
+        const {form } = req.body;
         // Check if project exists
         const project = await prisma.project.findUnique({
             where: { id: projectId }
@@ -156,7 +155,7 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
 
         // Check if settings exist
         const existingSettings = await prisma.settings.findUnique({
-            where: { id, projectId }
+            where: {  projectId }
         });
 
         if (!existingSettings) {
@@ -165,12 +164,10 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
         }
 
         const updatedSettings = await prisma.settings.update({
-            where: { id, projectId },
+            where: { projectId },
             data: {
-                system: JSON.stringify(system),
-                smtp: JSON.stringify(smtp),
-                daqstore: JSON.stringify(daqstore),
-                alarms: JSON.stringify(alarms)
+                form: JSON.stringify(form),
+             
             }
         });
         res.status(200).json(updatedSettings);

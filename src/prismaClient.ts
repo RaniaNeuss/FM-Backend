@@ -2,48 +2,7 @@
 
 import { PrismaClient,Device } from '@prisma/client';
 import deviceManager from './runtime/devices/deviceManager';
-
-
-// const prisma = new PrismaClient().$extends({
-
-//   query: {
-//     device: {
-//       async $allOperations({ operation, args, query }) {
-//         console.log(`Intercepted operation on Device: ${operation}`);
-//         console.log('Arguments:', args);
-
-//         const result = await query(args);
-
-//         if (operation === 'create') {
-//           const device = result as Device;
-//           console.log(`Device created with ID: ${device.id}`);
-//           if (device.enabled) {
-//             console.log(`Initializing polling for new device '${device.name}'...`);
-//             deviceManager.initializeAndPollDevices([device]);
-//           }
-        
-
-          
-//         } else if (operation === 'delete') {
-//           const deletedDeviceId = args.where.id;
-//           if (deletedDeviceId) {
-//             console.log(`Device deleted with ID: ${deletedDeviceId}`);
-//             deviceManager.handleDeviceDeleted(deletedDeviceId);
-//           }
-//         }
-        
-
-//         return result;
-//       },
-//     },
-//   },
-// });
-
-// export default prisma;
-
-
-
-
+import alarmManager from './runtime/alarms/alarmmanager';
 
 
 
@@ -104,7 +63,20 @@ const prisma = new PrismaClient().$extends({
         }
       },
     },
+    
   },
-});
+},
+
+
+
+
+);
 
 export default prisma;
+
+
+
+
+
+
+

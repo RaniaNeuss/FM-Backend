@@ -9,6 +9,8 @@ import prisma from './prismaClient'; // Import Prisma Client
 import initializeSocket from './socket'; // Import Socket Initialization
 import deviceManager from './runtime/devices/deviceManager';
 import projectRoutes from './routes/projectRoutes';
+import alarmManager from './runtime/alarms/alarmmanager'; // Import alarm manager
+
 import userRoutes from './routes/userRoutes';
 import alarmRoutes from './routes/alarmRoutes';
 import viewRoutes from './routes/viewRoutes';
@@ -101,6 +103,8 @@ const getexistingdevices = async () => {
   try {
     const devices = await getexistingdevices();
     await deviceManager.initializeAndPollDevices(devices);
+    await alarmManager.start(); // Start alarm manager
+
   } catch (error) {
     console.error('Error during server startup:', error);
   }
