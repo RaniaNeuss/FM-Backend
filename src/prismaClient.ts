@@ -1,6 +1,6 @@
 
 
-import { PrismaClient,Device } from '@prisma/client';
+import { PrismaClient,Device,Tag } from '@prisma/client';
 import deviceManager from './runtime/devices/deviceManager';
 import alarmManager from './runtime/alarms/alarmmanager';
 
@@ -63,20 +63,60 @@ const prisma = new PrismaClient().$extends({
         }
       },
     },
-    
+   
+    tag: {
+      async $allOperations({ operation, args, query }) {
+        console.log(`📡 Intercepted operation on Tag: ${operation}`);
+        console.log("🔎 Arguments:", args);
+
+        let prevTag: Tag | null = null;
+
+        try {
+          if (operation === "update") {
+            const tagId = args.where?.id;
+
+            if (tagId) {
+              prevTag = await prisma.tag.findUnique({ where: { id: tagId } });
+            } else {
+              console.warn("⚠️ No `id` provided in `where` clause for update operation.");
+            }
+          }
+
+          const result = await query(args);
+
+          if (operation === "update") {
+            const updatedTag = result as Tag;
+
+            if (prevTag) {
+              console.log(`🔄 Tag updated: ${updatedTag.id}`);
+              console.log(`📌 Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
+
+              if (prevTag.value !== updatedTag.value) {
+                console.log(`⚡ Tag value changed! Fetching updated tag and reprocessing alarms...`);
+                
+                // Fetch updated tag values before triggering alarm checks
+                const latestTag = await prisma.tag.findUnique({ where: { id: updatedTag.id } });
+
+                if (latestTag) {
+                  console.log(`✅ Latest Tag Value: ${latestTag.value}`);
+                  alarmManager.processAlarms(); // Trigger alarm checks
+                } else {
+                  console.warn(`⚠️ Could not fetch latest tag value for ${updatedTag.id}`);
+                }
+              }
+            } else {
+              console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
+            }
+          }
+
+          return result;
+        } catch (err) {
+          console.error("❌ Error in Prisma middleware:", err);
+          throw err;
+        }
+      },
+    },
   },
-},
-
-
-
-
-);
+});
 
 export default prisma;
-
-
-
-
-
-
-

@@ -41,10 +41,10 @@ export async function clearAlarms(all) {
 
 /**
  * Acknowledge an alarm
- * @param {string} alarmId - The ID of the alarm
+ * @param {string} id - The ID of the alarm
  * @param {string} userId - The ID of the user acknowledging the alarm
  */
-export async function setAlarmAck(alarmId, userId) {
+export async function setAlarmAck(id, userId) {
   try {
     // Fetch the username from the user ID
     const user = await prisma.user.findUnique({
@@ -56,22 +56,39 @@ export async function setAlarmAck(alarmId, userId) {
       throw new Error(`No user found with ID '${userId}'`);
     }
 
-    // Update the alarm with the username in `userAck`
-    const result = await prisma.alarmHistory.updateMany({
+    const currentTime = new Date();
+
+    // Update the alarm
+    const result = await prisma.alarm.updateMany({
       where: {
-        id: alarmId,
+        id: id,
         acktime: null, // Only check for null values
       },
       data: {
-        acktime: new Date(),
-        status: 'ACK',
-        userAck: user.username, // Set the username instead of user ID
+        acktime: currentTime,
+        status: "ACK",
+        userack: user.username, // Set the username instead of user ID
       },
     });
 
     if (result.count === 0) {
-      throw new Error(`No alarm found with ID '${alarmId}' to acknowledge or already acknowledged.`);
+      throw new Error(`No alarm found with ID '${id}' to acknowledge or already acknowledged.`);
     }
+
+    // Also update alarm history
+    const historyUpdate = await prisma.alarmHistory.updateMany({
+      where: {
+        alarmId: id,
+        acktime: null, // Only update if not already acknowledged
+      },
+      data: {
+        acktime: currentTime,
+        status: "ACK",
+        userack: user.username,
+      },
+    });
+
+    console.log(`✅ Alarm and alarm history updated successfully for ID: ${id}`);
 
     return true;
   } catch (err) {
@@ -80,7 +97,6 @@ export async function setAlarmAck(alarmId, userId) {
     throw new Error(errorMessage);
   }
 }
-
 
 
 /**
@@ -182,10 +198,10 @@ export async function setAlarms(alarms) {
           type: alr.type,
           status: status,
           text: alr.subproperty?.text || '',
-          onTime: alr.ontime,
-          offTime: alr.offtime,
-          ackTime: alr.acktime,
-          userAck: userAck,
+          ontime: alr.ontime,
+          offtime: alr.offtime,
+          acktime: alr.acktime,
+          userack: userack,
         },
       });
 

@@ -137,10 +137,10 @@ model Alarm {
   type           String?
   tagId          String         // Foreign key to associate with a Tag
   subproperty     String?
-  onTime          DateTime?
-  offTime         DateTime?
-  ackTime          DateTime?
-
+  ontime          DateTime?
+  offtime         DateTime?
+  acktime          DateTime?
+  userack   String?
 
 
   isEnabled      Boolean        @default(false)
@@ -157,15 +157,16 @@ model Alarm {
 model AlarmHistory {
   id        String    @id @default(uuid())
   alarmId   String
+  name           String? 
   type      String?
   status    String?
   message   String?
   group     String?  // Group associated with the alarm history
   text      String?  // Additional details or description
-  onTime    DateTime?
-  offTime   DateTime?
-  ackTime   DateTime?
-  userAck   String?
+  ontime    DateTime?
+  offtime   DateTime?
+  acktime   DateTime?
+  userack   String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   alarm     Alarm     @relation(fields: [alarmId], references: [id] ,onDelete: Cascade)

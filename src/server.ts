@@ -10,6 +10,7 @@ import initializeSocket from './socket'; // Import Socket Initialization
 import deviceManager from './runtime/devices/deviceManager';
 import projectRoutes from './routes/projectRoutes';
 import alarmManager from './runtime/alarms/alarmmanager'; // Import alarm manager
+import tagRoutes from './routes/tagRoutes';
 
 import userRoutes from './routes/userRoutes';
 import alarmRoutes from './routes/alarmRoutes';
@@ -31,7 +32,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: 'http://127.0.0.1:5500',
     credentials: true,
   })
 );
@@ -63,6 +64,7 @@ app.use('/api/alarms', alarmRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/tags', tagRoutes);
 
 // Initialize Socket.IO
 const { io, events,server } = initializeSocket(app);

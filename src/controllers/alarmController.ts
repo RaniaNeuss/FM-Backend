@@ -330,13 +330,13 @@ export const setAlarm = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { min, max, interval, timeInMinMaxRange, group,text } = subproperty;
+    const { min, max, checkDelay, timedelay, group,text ,ackmode } = subproperty;
 
-    if (min == null || max == null || !interval) {
+    if (min == null || max == null || !checkDelay || ! timedelay) {
       res.status(400).json({
         error: "validation_error",
         message:
-          "subproperty must include min, max, interval, and optionally timeInMinMaxRange.",
+          "subproperty must include min, max, interval, and  timeInMinMaxRange.",
       });
       return;
     }
@@ -398,9 +398,10 @@ const userIds = users.map(user => ({ id: user.id }));
         status: finalStatus, // Store correct status from runtime
         project: { connect: { id: projectId } },
         users: { connect: userIds },
-        onTime: ontime ? new Date(ontime) : null,
-        offTime: offtime ? new Date(offtime) : null,
-        ackTime: acktime ? new Date(acktime) : null,
+        ontime: ontime ? new Date(ontime) : null,
+        offtime: offtime ? new Date(offtime) : null,
+        acktime: acktime ? new Date(acktime) : null,
+        userack: userack ?  userack :null,
         
       },
       update: {
@@ -411,9 +412,11 @@ const userIds = users.map(user => ({ id: user.id }));
         isEnabled: isEnabled ?? false,
         status: finalStatus, // Ensure status updates correctly
         users: { set: userIds },
-        onTime: ontime ? new Date(ontime) : null,
-        offTime: offtime ? new Date(offtime) : null,
-        ackTime: acktime ? new Date(acktime) : null,
+        ontime: ontime ? new Date(ontime) : null,
+        offtime: offtime ? new Date(offtime) : null,
+        acktime: acktime ? new Date(acktime) : null,
+        userack: userack ?  userack :null,
+
       },
     });
 
@@ -424,13 +427,14 @@ const userIds = users.map(user => ({ id: user.id }));
       data: {
         alarmId: upsertedAlarm.id,
         type,
+        name,
         status: finalStatus,
         text: subproperty.text || "", // Uses alarm.subproperty.text directly
         group: subproperty.group || "", // Uses alarm.subproperty.group directly
-        onTime: upsertedAlarm.onTime, // Matches `alarm`
-        offTime: upsertedAlarm.offTime, // Matches `alarm`
-        ackTime: upsertedAlarm.ackTime, // Matches `alarm`
-        userAck: userack || "",
+        ontime: upsertedAlarm.ontime, // Matches `alarm`
+        offtime: upsertedAlarm.offtime, // Matches `alarm`
+        acktime: upsertedAlarm.acktime, // Matches `alarm`
+        userack: upsertedAlarm.userack || "",
       },
     });
 
@@ -465,7 +469,7 @@ const userIds = users.map(user => ({ id: user.id }));
 // Controller: Acknowledge Alarm
 export const acknowledgeAlarm = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { alarmId } = req.body;
+        const { id} = req.params;
         const userId = req.userId;
 
 
@@ -476,7 +480,7 @@ export const acknowledgeAlarm = async (req: Request, res: Response): Promise<voi
       
     
         // Validate alarmId
-        if (!alarmId) {
+        if (!id) {
             res.status(400).json({
                 error: 'missing_alarm_id',
                 message: 'alarmId is required.',
@@ -484,10 +488,10 @@ export const acknowledgeAlarm = async (req: Request, res: Response): Promise<voi
             return;
         }
 
-        console.log(`Acknowledging alarm with alarmId: ${alarmId}, userId: ${userId}`);
+        console.log(`Acknowledging alarm with alarmId: ${id}, userId: ${userId}`);
 
         // Acknowledge alarm
-        const result = await alarmstorage.setAlarmAck(alarmId, userId);
+        const result = await alarmstorage.setAlarmAck(id, userId);
 
         if (!result) {
             res.status(200).json({ success: false });
