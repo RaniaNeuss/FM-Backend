@@ -4,7 +4,8 @@ import {
   getAllProjects,
   getProjectById,
   updateProjectData,
-  assignUsersToProject,
+  assignUsersToProject, editAssignedUsers,       // New: Edit assigned users
+  removeAssignedUsers,
   deleteProject,getUsersByProjectId,
  
 } 
@@ -19,6 +20,11 @@ router.get('/getprojects',authenticateUser, getAllProjects); // GET /api/project
 
 // Fetch a project by ID
 router.get('/:id',authenticateUser, getProjectById); // GET /api/projects/:id
+// Edit (Replace) Assigned Users in a Project
+router.put('/:projectId/editusers', authenticateUser, editAssignedUsers);
+
+// Remove Specific Users from a Project
+router.delete('/:projectId/removeusers', authenticateUser, removeAssignedUsers);
 
 // Create a new project
 router.post('/create',authenticateUser, createProject); // POST /api/projects

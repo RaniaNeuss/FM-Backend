@@ -44,59 +44,59 @@ export async function clearAlarms(all) {
  * @param {string} id - The ID of the alarm
  * @param {string} userId - The ID of the user acknowledging the alarm
  */
-export async function setAlarmAck(id, userId) {
-  try {
-    // Fetch the username from the user ID
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true }, // Only fetch the username
-    });
+// export async function setAlarmAck(id, userId) {
+//   try {
+//     // Fetch the username from the user ID
+//     const user = await prisma.user.findUnique({
+//       where: { id: userId },
+//       select: { username: true }, // Only fetch the username
+//     });
 
-    if (!user) {
-      throw new Error(`No user found with ID '${userId}'`);
-    }
+//     if (!user) {
+//       throw new Error(`No user found with ID '${userId}'`);
+//     }
 
-    const currentTime = new Date();
+//     const currentTime = new Date();
 
-    // Update the alarm
-    const result = await prisma.alarm.updateMany({
-      where: {
-        id: id,
-        acktime: null, // Only check for null values
-      },
-      data: {
-        acktime: currentTime,
-        status: "ACK",
-        userack: user.username, // Set the username instead of user ID
-      },
-    });
+//     // Update the alarm
+//     const result = await prisma.alarm.updateMany({
+//       where: {
+//         id: id,
+//         acktime: null, // Only check for null values
+//       },
+//       data: {
+//         acktime: currentTime,
+//         status: "ACK",
+//         userack: user.username, // Set the username instead of user ID
+//       },
+//     });
 
-    if (result.count === 0) {
-      throw new Error(`No alarm found with ID '${id}' to acknowledge or already acknowledged.`);
-    }
+//     if (result.count === 0) {
+//       throw new Error(`No alarm found with ID '${id}' to acknowledge or already acknowledged.`);
+//     }
 
-    // Also update alarm history
-    const historyUpdate = await prisma.alarmHistory.updateMany({
-      where: {
-        alarmId: id,
-        acktime: null, // Only update if not already acknowledged
-      },
-      data: {
-        acktime: currentTime,
-        status: "ACK",
-        userack: user.username,
-      },
-    });
+//     // Also update alarm history
+//     const historyUpdate = await prisma.alarmHistory.updateMany({
+//       where: {
+//         alarmId: id,
+//         acktime: null, // Only update if not already acknowledged
+//       },
+//       data: {
+//         acktime: currentTime,
+//         status: "ACK",
+//         userack: user.username,
+//       },
+//     });
 
-    console.log(`✅ Alarm and alarm history updated successfully for ID: ${id}`);
+//     console.log(`✅ Alarm and alarm history updated successfully for ID: ${id}`);
 
-    return true;
-  } catch (err) {
-    const errorMessage = `alarmsstorage.setAlarmAck failed: ${err.message}`;
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-}
+//     return true;
+//   } catch (err) {
+//     const errorMessage = `alarmsstorage.setAlarmAck failed: ${err.message}`;
+//     console.error(errorMessage);
+//     throw new Error(errorMessage);
+//   }
+// }
 
 
 /**
@@ -267,6 +267,6 @@ export default {
   setAlarms,
   clearAlarms,
   removeAlarm,
-  setAlarmAck,
+  
 };
 

@@ -102,7 +102,7 @@ model Tag {
   daq        Daq?
   alarms     Alarm[]  @relation("TagAlarms") // Relation to Alarm
   variables  Variable[] @relation("TagVariables") // Relation to Variable
-
+  bitmask    Int? 
   items      Item[]
   device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, name: "DeviceTags")
   @@unique([deviceId, name]) // Ensure tags are unique within the scope of a device
@@ -156,7 +156,7 @@ model Alarm {
 
 model AlarmHistory {
   id        String    @id @default(uuid())
-  alarmId   String
+  alarmId   String?
   name           String? 
   type      String?
   status    String?
@@ -169,7 +169,7 @@ model AlarmHistory {
   userack   String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  alarm     Alarm     @relation(fields: [alarmId], references: [id] ,onDelete: Cascade)
+  alarm     Alarm?    @relation(fields: [alarmId], references: [id], onDelete: SetNull)
   users          User[]         @relation("AlarmHistoryAcknowledgements")
 
 }

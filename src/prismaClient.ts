@@ -1,6 +1,6 @@
 
 
-import { PrismaClient,Device,Tag } from '@prisma/client';
+import { PrismaClient,Device,Tag ,Alarm} from '@prisma/client';
 import deviceManager from './runtime/devices/deviceManager';
 import alarmManager from './runtime/alarms/alarmmanager';
 
@@ -12,7 +12,6 @@ const prisma = new PrismaClient().$extends({
     device: {
       async $allOperations({ operation, args, query }) {
         console.log(`Intercepted operation on Device: ${operation}`);
-        console.log('Arguments:', args);
 
         let prevDevice: Device | null = null;
 
@@ -64,6 +63,10 @@ const prisma = new PrismaClient().$extends({
       },
     },
    
+
+
+
+    
     tag: {
       async $allOperations({ operation, args, query }) {
         console.log(`📡 Intercepted operation on Tag: ${operation}`);
@@ -116,7 +119,55 @@ const prisma = new PrismaClient().$extends({
         }
       },
     },
+  
+  alarm: {
+    async $allOperations({ operation, args, query }) {
+      console.log(`🚨 Intercepted operation on Alarm: ${operation}`);
+      console.log("Arguments:", args);
+  
+      let prevAlarm: Alarm | null = null;
+  
+      try {
+        if (operation === "update") {
+          const alarmId = args.where?.id;
+          if (alarmId) {
+            prevAlarm = await prisma.alarm.findUnique({
+              where: { id: alarmId },
+              include: {
+                tag: true, // Ensure tag data is included
+                alarmHistories: true, // Include related alarm histories
+              },
+            });
+          }
+        }
+  
+        const result = await query(args);
+  
+        if (operation === "update") {
+          const updatedAlarm = result as Alarm;
+
+          if (prevAlarm) {
+            console.log(`alarm updated with ID: ${updatedAlarm.id}`);
+            deviceManager.handleDeviceUpdated(updatedAlarm, prevAlarm);
+          } else {
+            console.warn(`No previous state found for device with ID: ${args.where?.id}`);
+          }
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Error in Prisma middleware:', err);
+        throw err;
+      }
+    },
   },
+}
+
+
+
+
+  
+  
 });
 
 export default prisma;
