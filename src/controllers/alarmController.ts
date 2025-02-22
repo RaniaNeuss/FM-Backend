@@ -1,323 +1,79 @@
 import { Request, Response } from 'express';
 
 import * as alarmstorage from '../runtime/alarms/alarmstorage';
-import { PrismaClient } from "@prisma/client";
 import  alarmManager from '../runtime/alarms/alarmmanager';
-const prisma = new PrismaClient();
-import { getAlarmsHistory } from '../runtime/alarms/alarmstorage';
 
 
-
-
-//set alarm
-
-
-// export const setAlarm = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { projectId } = req.params;
-//     const alarm = req.body;
-
-//     if (!projectId) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Project ID is required in the URL parameters.",
-//       });
-//     }
-
-//     if (!alarm || typeof alarm !== "object") {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Expected an object containing alarm data in the request body.",
-//       });
-//     }
-
-//     console.log("Processing alarm for projectId:", projectId);
-
-//     const { id, name,text, type, tagId, min, max, interval, timeInMinMaxRange, status } = alarm;
-
-//     if (!type || !tagId || min == null || max == null || !interval) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Missing required fields: type, tagId, min, max, interval are mandatory.",
-//       });
-//     }
-
-//     // Check if the tag exists
-//     const tag = await prisma.tag.findUnique({ where: { id: tagId } });
-//     if (!tag) {
-//      res.status(400).json({
-//         error: "validation_error",
-//         message: `Tag with id ${tagId} not found.`,
-//       });
-//     }
-
-//     // 🔹 Fetch all users that belong to groups "SuperAdmin" or "Editor"
-//     const users = await prisma.user.findMany({
-//       where: {
-//         groups: {
-//           some: {
-//             name: { in: ["SuperAdmin", "Editor"] } // Only fetch users in these groups
-//           }
-//         }
-//       },
-//       select: { id: true } // Only fetch user IDs
-//     });
-
-//     if (users.length === 0) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "No users found in groups 'SuperAdmin' or 'Editor'.",
-//       });
-//     }
-
-//     // Extract user IDs
-//     const userIds = users.map(user => ({ id: user.id }));
-
-//     // 🔹 Upsert the alarm and associate with users
-//     const upsertedAlarm = await prisma.alarm.upsert({
-//       where: id ? { id } : { id: "non-existent-id" },
-//       create: {
-//         name,
-//         type,
-//         text,
-//         tag: { connect: { id: tagId } },
-//         min,
-//         max,
-//         interval,
-//         timeInMinMaxRange: timeInMinMaxRange || 0, // Include new field
-//         isEnabled: alarm.isEnabled || false,
-//         project: { connect: { id: projectId } },
-//         users: { connect: userIds } // Connect users to the alarm
-//       },
-//       update: {
-//         name,
-//         type,
-//         tagId,
-//         min,
-//         max,
-//         interval,
-//         timeInMinMaxRange: timeInMinMaxRange || 0, // Include new field
-//         isEnabled: alarm.isEnabled || false,
-//         users: { set: userIds } // Update the associated users
-//       },
-//     });
-
-//     console.log(`Alarm ${upsertedAlarm.id} upserted successfully.`);
-
-//     // 🔹 Insert into alarm history
-//     await prisma.alarmHistory.create({
-//       data: {
-//         alarmId: upsertedAlarm.id,
-//         type,
-//         status: status || "inactive",
-//         text: alarm.text || "",
-//       },
-//     });
-
-//     console.log(`History for alarm ${upsertedAlarm.id} created successfully.`);
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Alarm processed successfully.",
-//     });
-
-//   } catch (err: any) {
-//     console.error(`Error setting alarm: ${err.message}`);
-//     res.status(500).json({
-//       error: "unexpected_error",
-//       message: err.message,
-//     });
-//   }
-// };
-
-
-  
-
-// export const setAlarm = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { projectId } = req.params;
-//     const alarm = req.body;
-
-//     // Validate `projectId`
-//     if (!projectId) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Project ID is required in the URL parameters.",
-//       });
-//       return;
-//     }
-
-//     // Validate request body
-//     if (!alarm || typeof alarm !== "object") {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Expected an object containing alarm data in the request body.",
-//       });
-//       return;
-//     }
-
-//     console.log("Processing alarm for projectId:", projectId);
-
-//     const {
-//       id,
-//       name,
-//       type,
-//       tagId,
-//       isEnabled,
-//       status,
-//       subproperty, // Now includes min, max, interval, and timeInMinMaxRange
-//     } = alarm;
-
-//     // Validate required fields inside `subproperty`
-//     if (!type || !tagId || !subproperty || typeof subproperty !== "object") {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message:
-//           "Missing required fields: type, tagId, and subproperty are mandatory.",
-//       });
-//       return;
-//     }
-
-//     const { min, max, interval, timeInMinMaxRange ,text} = subproperty;
-
-//     if (min == null || max == null || !interval) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message:
-//           "subproperty must include min, max, interval, and optionally timeInMinMaxRange.",
-//       });
-//       return;
-//     }
-
-//     // Ensure `tagId` exists
-//     const tag = await prisma.tag.findUnique({ where: { id: tagId } });
-//     if (!tag) {
-//       res.status(404).json({
-//         error: "not_found",
-//         message: `Tag with id ${tagId} not found.`,
-//       });
-//       return;
-//     }
-
-//     //Fetch all users that belong to groups "SuperAdmin" or "Editor"
-//     const users = await prisma.user.findMany({
-//       where: {
-//         groups: {
-//           some: {
-//             name: { in: ["SuperAdmin", "Editor"] } // Only fetch users in these groups
-//           }
-//         }
-//       },
-//       select: { id: true } // Only fetch user IDs
-//     });
-
-//     if (users.length === 0) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "No users found in groups 'SuperAdmin' or 'Editor'.",
-//       });
-//     }
-
-//     // Extract user IDs
-//     const userIds = users.map(user => ({ id: user.id }));
-
-
-//     // 🔹 Upsert (Create or Update) Alarm
-//     const upsertedAlarm = await prisma.alarm.upsert({
-//       where: id ? { id } : { id: "non-existent-id" },
-//       create: {
-//         name,
-//         type,
-        
-//         tag: { connect: { id: tagId } },
-//         subproperty: JSON.stringify(subproperty), // Store subproperty as JSON
-//         isEnabled: isEnabled ?? false,
-//         project: { connect: { id: projectId } },
-//         users: { connect: userIds },
-//       },
-//       update: {
-//         name,
-//         type,
-//         tagId,
-//         subproperty: JSON.stringify(subproperty), // Update subproperty
-//         isEnabled: isEnabled ?? false,
-//         users: { set: userIds },
-//       },
-//     });
-
-//     console.log(`✅ Alarm ${upsertedAlarm.id} upserted successfully.`);
-
-//     // 🔹 Insert into `alarmHistory`
-//     await prisma.alarmHistory.create({
-//       data: {
-//         alarmId: upsertedAlarm.id,
-//         type,
-//         status: status || "inactive",
-      
-//       },
-//     });
-
-//     console.log(`✅ History for alarm ${upsertedAlarm.id} created successfully.`);
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Alarm processed successfully.",
-//       alarm: upsertedAlarm,
-//     });
-//   } catch (err: any) {
-//     console.error(`❌ Error setting alarm: ${err.message}`);
-//     res.status(500).json({
-//       error: "unexpected_error",
-//       message: err.message,
-//     });
-//   }
-// };
+import prisma from '../prismaClient';
 
 
 // Alarm Status Enum (Matching Runtime)
 const AlarmStatusEnum = {
-  VOID: "VOID",
+  VOID: "",
   ON: "N",
   OFF: "NF",
   ACK: "NA",
 };
 
+
 export const setAlarm = async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const alarm = req.body;
-
     if (!projectId) {
-      res.status(400).json({ error: "validation_error", message: "Project ID is required." });
+      res.status(400).json({
+        error: "validation_error",
+        message: "Project ID is required in the URL parameters.",
+      });
       return;
     }
 
-    const { id, name, type, tagId, isEnabled, status, subproperty, toremove } = alarm;
+  
+    const {name, type, tagId, isEnabled, status, subproperty, toremove } = req.body;
 
     if (!type || !tagId || !subproperty) {
-      res.status(400).json({ error: "validation_error", message: "Type, tagId, and subproperty are required." });
+      res
+        .status(400)
+        .json({
+          error: "validation_error",
+          message: "Type, tagId, and subproperty are required.",
+        });
       return;
     }
 
-    const { min, max } = subproperty;
+    // Extract subproperty fields
+    const { min, max, ackmode, timedelay, checkdelay, text, group } = subproperty;
     if (min == null || max == null) {
-      res.status(400).json({ error: "validation_error", message: "Subproperty must include min and max." });
+      res.status(400).json({
+        error: "validation_error",
+        message: "subproperty must include min and max.",
+      });
       return;
     }
 
+    // Default ackmode if not given
+    if (!subproperty.ackmode) {
+      subproperty.ackmode = "float";
+    }
+
+    // Check the tag
     const tag = await prisma.tag.findUnique({ where: { id: tagId } });
     if (!tag) {
-      res.status(404).json({ error: "not_found", message: `Tag with id ${tagId} not found.` });
+      res.status(404).json({
+        error: "not_found",
+        message: `Tag with id ${tagId} not found.`,
+      });
       return;
     }
 
+    // Evaluate the current tag value
     const tagValue = parseFloat(tag.value || "0");
-    let initialStatus = tagValue >= min && tagValue <= max ? "N" : "VOID";
+    let initialStatus = tagValue >= min && tagValue <= max ? "N" : "";
+    // If alarm is ON, we set an ontime
     let ontime = initialStatus === "N" ? new Date() : null;
 
-    const upsertedAlarm = await prisma.alarm.upsert({
-      where: id ? { id } : { id: "non-existent-id" },
-      create: {
+    // 1) Upsert the Alarm in the main Alarm table
+    const newAlarm = await prisma.alarm.create({
+      data: {
         name,
         type,
         tag: { connect: { id: tagId } },
@@ -326,176 +82,367 @@ export const setAlarm = async (req: Request, res: Response): Promise<void> => {
         status: initialStatus,
         project: { connect: { id: projectId } },
         ontime,
+        
       },
-      update: {
-        name,
-        type,
-        tagId,
-        subproperty: JSON.stringify(subproperty),
-        isEnabled: isEnabled ?? false,
-        status: initialStatus,
-        ontime,
-      },
+      include: { tag: true },
+      
+      
+
+
     });
 
-    console.log(`✅ Alarm ${upsertedAlarm.id} upserted successfully.`);
 
-    await prisma.alarmHistory.create({
-      data: {
-        alarmId: upsertedAlarm.id,
-        name: alarm.name,
-        type,
-        status: initialStatus,
-        text: subproperty.text || "",
-        ontime: upsertedAlarm.ontime,
-      },
-    });
-
-    if (toremove) {
-      await prisma.alarm.delete({ where: { id: upsertedAlarm.id } });
-      console.log(`❌ Alarm ${upsertedAlarm.id} deleted.`);
+    // 2) Now, upsert into AlarmHistory using (alarmId, ontime) as the composite
+    // If 'ontime' is null (because it's VOID), we can skip history OR 
+    // you might store a placeholder. Up to your logic.
+    if (ontime) {
+      await prisma.alarmHistory.upsert({
+        where: {
+          // composite unique index on (alarmId, ontime)
+          alarmId_ontime: {
+            alarmId: newAlarm.id,
+            ontime,
+          },
+        },
+        create: {
+          alarmId: newAlarm.id,
+          name: name,
+          type,
+          status: initialStatus,
+          text: text || "",
+          group: group || "",
+          ontime, // new ON cycle
+        },
+        update: {
+          // If it already exists, update status
+          status: initialStatus,
+          // Note: If you want to mark OFF or ACK, do it in future updates 
+          updatedAt: new Date(),
+        },
+      });
     }
 
-    res.status(200).json({ success: true, message: "Alarm processed successfully.", alarm: upsertedAlarm });
+    // 3) If "toremove" is set, remove the alarm from the DB (main alarm table).
+    if (toremove) {
+      await prisma.alarm.delete({ where: { id: newAlarm.id } });
+      console.log(`❌ Alarm ${newAlarm.id} deleted.`);
+    }
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Alarm processed successfully.",
+        alarm: newAlarm,
+      });
   } catch (err) {
-    console.error(`❌ Error setting alarm: `);
-    res.status(500).json({ error: "unexpected_error",  });
+    console.error(`❌ Error setting alarm: `, err);
+    res.status(500).json({
+      error: "unexpected_error",
+      message: err instanceof Error ? err.message : `${err}`,
+    });
   }
 };
 
 
 
 
-// Controller: Acknowledge Alarm
-// export const setAlarmAck = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { alarmId } = req.params; // Extract alarmId from request
-//     const userId = req.userId; // Extract userId from request (middleware should set this)
-
-//     // Fetch user details
-//     const user = await prisma.user.findUnique({
-//       where: { id: userId },
-//       select: { username: true },
-//     });
-
-//     if (!user) {
-//       res.status(404).json({ success: false, message: `User with ID ${userId} not found` });
-//       return;
-//     }
-
-//     // Find the alarm to acknowledge
-//     const alarm = await prisma.alarm.findUnique({
-//       where: { id: alarmId },
-//     });
-
-//     if (!alarm) {
-//       res.status(404).json({ success: false, message: `Alarm with ID ${alarmId} not found` });
-//       return;
-//     }
-
-//     // Ensure the alarm is in a valid state for acknowledgment
-//     if (alarm.status !== AlarmStatusEnum.ON && alarm.status !== AlarmStatusEnum.OFF) {
-//       res.status(400).json({ success: false, message: `Alarm ${alarmId} is not in a valid state for acknowledgment` });
-//       return;
-//     }
-
-    
-//   } catch (error) {
-//     console.error(`❌ Error acknowledging alarm:`, error);
-//     res.status(500).json({ success: false, message: "Internal Server Error" });
-//   }
-// };
-
-
- export const setAlarmAck = async (req: Request, res: Response): Promise<void> => {
+export const editAlarm = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { alarmId } = req.params;   // e.g. "/alarms/:alarmId/ack"
-    const userId = req.userId;        // from auth
+    const { alarmId } = req.params;
+    if (!alarmId) {
+      res.status(400).json({ error: "validation_error", message: "Alarm ID is required." });
+      return;
+    }
 
-    // 1) Validate presence of alarmId, userId, etc.
-    // 2) Check DB if you want to ensure it’s valid. 
-    // 3) Then simply call your manager method:
+    // Destructure possible fields from the request body for partial updates
+    const { name, type, tagId, isEnabled, status, subproperty } = req.body;
+    const dataToUpdate: any = {};
 
-    const user = await prisma.user.findUnique({ 
-      where: { id: userId }, 
+    if (name !== undefined) {
+      dataToUpdate.name = name;
+    }
+    if (type !== undefined) {
+      dataToUpdate.type = type;
+    }
+    if (isEnabled !== undefined) {
+      dataToUpdate.isEnabled = isEnabled;
+    }
+    if (status !== undefined) {
+      dataToUpdate.status = status;
+    }
+    if (subproperty !== undefined) {
+      dataToUpdate.subproperty = JSON.stringify(subproperty);
+    }
+    // Only update the tag connection if tagId is provided
+    if (tagId !== undefined) {
+      dataToUpdate.tag = { connect: { id: tagId } };
+    }
+
+    // If no fields are provided, return an error.
+    if (Object.keys(dataToUpdate).length === 0) {
+      res.status(400).json({
+        error: "validation_error",
+        message: "No valid fields provided for update.",
+      });
+      return;
+    }
+
+    // Update the alarm record in the DB
+    const updatedAlarm = await prisma.alarm.update({
+      where: { id: alarmId },
+      data: dataToUpdate,
+            include: { tag: true },
+
+    });
+
+    console.log(`✅ Alarm ${updatedAlarm.id} updated successfully in DB.`);
+    // Notice: We do NOT call alarmManager.addOrUpdateAlarmInMemory(updatedAlarm) here.
+    // The Prisma middleware will automatically intercept this update and update the in-memory manager.
+
+    res.status(200).json({
+      success: true,
+      message: "Alarm updated successfully.",
+      alarm: updatedAlarm,
+    });
+  } catch (error: any) {
+    console.error("Error updating alarm:", error.message);
+    res.status(500).json({
+      error: "unexpected_error",
+      message: error.message,
+    });
+  }
+};
+
+export const setAlarmAck = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { alarmId } = req.params;    // e.g. /alarms/:alarmId/ack
+    const userId = req.userId;         // from auth middleware
+
+    // 1) Validate presence
+    if (!alarmId) {
+      res.status(400).json({
+        success: false,
+        message: "Alarm ID is required.",
+      });
+      return; // <-- End the function
+    }
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "User not found in request context (userId).",
+      });
+      return; // <-- End the function
+    }
+
+    // 2) Fetch user details (optional if you want to confirm user exists)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
       select: { username: true },
     });
     if (!user) {
-       res.status(404).json({ success: false, message: "User not found." });
-       return;
+      res.status(404).json({
+        success: false,
+        message: `User with ID ${userId} not found.`,
+      });
+      return; // <-- End the function
     }
 
-    // direct call by ID
+    // 3) Check that the alarm exists in DB
+    const alarm = await prisma.alarm.findUnique({ where: { id: alarmId } ,     
+    });
+    if (!alarm) {
+      res.status(404).json({
+        success: false,
+        message: `Alarm with ID ${alarmId} not found.`,
+      });
+      return; // <-- End the function
+    }
+
+    // 4) Acknowledge the alarm in memory
+    //    setAlarmAck expects (alarmId, username) if that's how you implemented it
     const changed = await alarmManager.setAlarmAck(alarmId, user.username);
 
+    // 5) Return a response based on the result
     if (changed) {
-       res.status(200).json({
+      res.status(200).json({
         success: true,
         message: `Alarm ${alarmId} acknowledged by ${user.username}.`,
       });
     } else {
-       res.status(400).json({
+      // If there's no matching in-memory alarm or it's already acknowledged
+      res.status(400).json({
         success: false,
-        message: "No matching in-memory alarm or it was already acknowledged.",
+        message: "No matching in-memory alarm, or it was already acknowledged.",
       });
     }
   } catch (error) {
-    console.error("Error acknowledging by ID:", error);
-     res.status(500).json({
+    console.error("Error acknowledging alarm:", error);
+    res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
   }
 };
 
-// Controller: Clear Alarms
 
 
-export const clearAlarms = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { all } = req.body;
-
-        // Clear alarms using the provided `all` value
-        const result = await alarmstorage.clearAlarms(all);
-
-        if (!result) {
-            res.status(200).json({ success: false });
-            return;
-        }
-
-        res.status(200).json({ success: true });
-    } catch (err: any) {
-        console.error(`Error clearing alarms: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: err.message,
-        });
-    }
-};
 
 
 
 
 export const getAlarmHistory = async (req: Request, res: Response): Promise<void> => {
-    try {
-        // Parse body parameters
-        const from = req.body.from ? parseInt(req.body.from, 10) : 0;
-        const to = req.body.to ? parseInt(req.body.to, 10) : Date.now();
+  try {
+    // 1) Extract the fromDate/toDate strings from the JSON body
+    //    If not provided, default them to "today".
+    const fromDateStr = req.body.fromDate || new Date().toISOString().slice(0, 10);
+    const toDateStr = req.body.toDate || new Date().toISOString().slice(0, 10);
 
-        console.log(`Fetching alarm history from ${new Date(from).toISOString()} to ${new Date(to).toISOString()}`);
+    // 2) Convert each date string into start-of-day and end-of-day in UTC
+    //    For fromDate, we want 00:00:00.000
+    const fromDate = new Date(fromDateStr);
+    const fromYear = fromDate.getUTCFullYear();
+    const fromMonth = fromDate.getUTCMonth(); // 0-based
+    const fromDay = fromDate.getUTCDate();
+    const fromStart = new Date(Date.UTC(fromYear, fromMonth, fromDay, 0, 0, 0, 0));
 
-        // Fetch alarm history using the utility function
-        const history = await getAlarmsHistory(from, to);
+    // For toDate, we want 23:59:59.999
+    // Alternatively, if you want an exclusive bound, you can go from the next day’s 00:00:00
+    const toDate = new Date(toDateStr);
+    const toYear = toDate.getUTCFullYear();
+    const toMonth = toDate.getUTCMonth();
+    const toDay = toDate.getUTCDate();
+    const toEnd = new Date(Date.UTC(toYear, toMonth, toDay, 23, 59, 59, 999));
 
-        res.status(200).json(history);
-    } catch (err: any) {
-        console.error(`Error fetching alarm history: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: err.message,
-        });
-    }
+    console.log(
+      `Fetching AlarmHistory from ${fromStart.toISOString()} to ${toEnd.toISOString()}`
+    );
+
+    // 3) Query with Prisma, filtering `createdAt` between those boundaries
+    const history = await prisma.alarmHistory.findMany({
+      where: {
+        createdAt: {
+          gte: fromStart,  // >= fromStart
+          lte: toEnd,      // <= toEnd
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // 4) Return the matching rows
+     res.status(200).json(history);
+  } catch (error: any) {
+    console.error("Error fetching alarm history by date range:", error.message);
+     res.status(500).json({
+      error: "unexpected_error",
+      message: error.message,
+    });
+  }
 };
+
+export const clearOneAlarm = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { alarmId } = req.params;
+    if (!alarmId) {
+     res.status(400).json({ 
+        success: false, 
+        message: "Alarm ID is required." 
+      });
+    }
+
+    // 1) Delete the alarm from DB
+    await prisma.alarm.delete({
+      where: { id: alarmId },
+    });
+
+   
+
+    res.status(200).json({
+      success: true,
+      message: `Alarm ${alarmId} has been removed.`,
+    });
+  } catch (error: any) {
+    console.error("Error clearing one alarm:", error);
+   res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+
+ * Clears all alarms from the DB and in-memory manager.
+ */
+export const clearAllAlarms = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // 1) Delete all alarms in DB
+    await prisma.alarm.deleteMany({});
+
+    // 2) Also empty them in memory
+    alarmManager.clearAlarmsFlag = true; // or directly do alarmManager.clearAlarms()
+    // If you have a dedicated method:
+    // await alarmManager.clearAlarms(true);
+
+    res.status(200).json({
+      success: true,
+      message: "All alarms have been cleared from the database and memory.",
+    });
+  } catch (error: any) {
+    console.error("Error clearing all alarms:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * DELETE /alarms/history
+ * Deletes all alarm histories from the DB.
+ * (If you want partial or date-based, adapt as needed.)
+ */
+export const deleteAllAlarmHistories = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // If your alarm history table is named alarmHistory:
+    await prisma.alarmHistory.deleteMany({});
+
+    res.status(200).json({
+      success: true,
+      message: "All alarm histories have been deleted.",
+    });
+  } catch (error: any) {
+    console.error("Error deleting alarm histories:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

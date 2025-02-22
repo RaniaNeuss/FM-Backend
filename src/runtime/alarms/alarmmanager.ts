@@ -1,5 +1,6 @@
 import { PrismaClient, Alarm as AlarmModel, Tag as TagModel } from "@prisma/client";
 import { EventEmitter } from "events";
+import { Server } from "socket.io";
 
 // ---------- Enums and Constants (similar to 1st code) ----------
 
@@ -124,12 +125,12 @@ class Alarm {
   /**
    * Acknowledge the alarm
    */
-  setAck(user: string) {
+  setAck(username: string) {
     if (!this.acktime) {
       this.acktime = Date.now();
       this.lastcheck = 0;
-      this.userack = user;
-      console.log(`[Ack] Alarm ${this.name} acknowledged by ${user}.`);
+      this.userack = username;
+      console.log(`[Ack] Alarm ${this.name} acknowledged by ${username}.`);
     }
   }
 
@@ -172,10 +173,13 @@ class Alarm {
       finalValue !== undefined &&
       finalValue >= minVal &&
       finalValue <= maxVal;
+      console.log(`[DEBUG]  ${this.name} inRange=${inRange}, status=${this.status}, ontime=${this.ontime}, now=${currentTime}`);
 
     switch (this.status) {
       case AlarmStatusEnum.VOID:
         if (!inRange) {
+          console.log(`[DEBUG]  ${this.name} inRange=${inRange}, status=${this.status}, ontime=${this.ontime}, now=${currentTime}`);
+
           this.ontime = null;
           return false;
         } else if (!this.ontime) {
@@ -191,6 +195,8 @@ class Alarm {
           return true;
         }
         return false;
+
+
 
       case AlarmStatusEnum.ON:
         if (!inRange) {
@@ -259,7 +265,7 @@ class AlarmsManager {
   private status: AlarmsStatusEnum;
   private working: boolean;
   private alarms: { [key: string]: Alarm[] }; // group by name or by composite ID
-  private clearAlarmsFlag: boolean;
+  public clearAlarmsFlag: boolean;
 
   constructor() {
     this.prisma = prisma;
@@ -325,6 +331,7 @@ class AlarmsManager {
     }
   }
 
+  
   /**
    * Optional DB init
    */
@@ -368,60 +375,195 @@ class AlarmsManager {
       this.alarms[alarm.name].push(alarm);
     }
   }
+  
+  public addOrUpdateAlarmInMemory(dbAlarm: AlarmModel): void {
+    // 1) Convert the DB alarm to your local Alarm instance
+    //    Possibly re-fetch the Tag if needed or parse subproperty
+    const alarmObj = new Alarm({
+      ...dbAlarm,
+      // if you need the tag, you might do:
+      // tag: <some query or partial Tag object if needed>
+    });
+
+    // 2) Check if we already have an array for alarmObj.name
+    if (!this.alarms[alarmObj.name]) {
+      this.alarms[alarmObj.name] = [];
+    }
+
+    // 3) See if we have an existing alarm with the same .id
+    const existingIndex = this.alarms[alarmObj.name].findIndex(a => a.id === alarmObj.id);
+    if (existingIndex >= 0) {
+      // update in place
+      this.alarms[alarmObj.name][existingIndex] = alarmObj;
+      console.log(`🔄 Alarm ${alarmObj.id} updated in memory.`);
+    } else {
+      // add new
+      this.alarms[alarmObj.name].push(alarmObj);
+      console.log(`🆕 Alarm ${alarmObj.id} added in memory.`);
+    }
+  }
 
   /**
-   * Process each alarm (like `_checkAlarms` in 1st code).
+   * Called when an alarm is deleted in the DB.
+   * We remove it from the in-memory dictionary.
    */
-   async processAlarms(): Promise<boolean> {
-    console.log("🔄 Checking alarms...");
-    let anyChange = false;
+  public removeAlarmInMemory(alarmId: string): void {
+    // Find which array it’s in
     for (const nameKey in this.alarms) {
-      for (const alarm of this.alarms[nameKey]) {
-        if (!alarm.isEnabled) {
-          // If alarm not enabled, skip or optionally remove
-          continue;
+      const idx = this.alarms[nameKey].findIndex(a => a.id === alarmId);
+      if (idx >= 0) {
+        this.alarms[nameKey].splice(idx, 1);
+        console.log(`❌ Alarm ${alarmId} removed from memory.`);
+        // If the array becomes empty, optionally delete the key
+        if (this.alarms[nameKey].length === 0) {
+          delete this.alarms[nameKey];
         }
+        break; // done removing
+      }
+    }
+  }
 
-        // 1) fetch the latest Tag value
-        let tagValue: number | null = null;
-        if (alarm.tag) {
-          const latestTag = await this.prisma.tag.findUnique({
-            where: { id: alarm.tag.id },
-          });
-          if (latestTag?.value !== undefined && latestTag.value !== null) {
-            tagValue = parseFloat(latestTag.value);
+
+  public async updateAlarmsByTag(updatedTag: TagModel): Promise<void> {
+    console.log(`Updating alarms in memory for tag ${updatedTag.id}`);
+    for (const nameKey in this.alarms) {
+      const groupAlarms = this.alarms[nameKey];
+      for (let i = 0; i < groupAlarms.length; i++) {
+        const alarm = groupAlarms[i];
+        
+        // 1) Check if this alarm uses the updated tag
+        if (alarm.tag && alarm.tag.id === updatedTag.id) {
+          // 2) Skip if alarm is not enabled
+          if (!alarm.isEnabled) {
+            console.log(`Alarm ${alarm.id} is disabled; skipping re-check for updated tag ${updatedTag.id}.`);
+            continue;
+          }
+  
+          // 3) Update the alarm's tag reference
+          alarm.tag = updatedTag;
+  
+          // 4) Re-check the alarm state using the updated tag value
+          const currentTime = Date.now();
+          const tagValue = parseFloat(updatedTag.value || "0");
+          const changed = await alarm.check(currentTime, tagValue);
+          
+          // 5) If state changed, handle the alarm update & possible action
+          if (changed) {
+            await this.handleAlarmUpdate(alarm);
+            if (alarm.type === AlarmsTypes.ACTION && alarm.status === AlarmStatusEnum.ON) {
+              await this.handleAlarmAction(alarm);
+            }
           }
         }
+      }
+    }
+  }
+  
+  
+  
+  // async processAlarms(): Promise<boolean> {
+  //   console.log("🔄 Checking alarms...");
+  //   let anyChange = false;
+  
+  //   // Iterate over each group of alarms
+  //   for (const nameKey in this.alarms) {
+  //     // We'll store them in a local array reference to modify as needed
+  //     const groupAlarms = this.alarms[nameKey];
+  
+  //     // Iterate backward so we can safely remove alarms by index
+  //     for (let i = groupAlarms.length - 1; i >= 0; i--) {
+  //       const alarm = groupAlarms[i];
+  
+  //       if (!alarm.isEnabled) {
+  //         // If alarm not enabled, skip or optionally remove
+  //         continue;
+  //       }
+  
+  //       // 1) Fetch the latest Tag value
+  //       let tagValue: number | null = null;
+  //       if (alarm.tag) {
+  //         const latestTag = await this.prisma.tag.findUnique({
+  //           where: { id: alarm.tag.id },
+  //         });
+  //         if (latestTag?.value !== undefined && latestTag.value !== null) {
+  //           tagValue = parseFloat(latestTag.value);
+  //         }
+  //       }
+  
+  //       // 2) Check transitions
+  //       const currentTime = Date.now();
+  //       const changed = await alarm.check(currentTime, tagValue);
+  
+  //       // 3) If changed => update in DB and handle actions
+  //       if (changed) {
+  //         anyChange = true;
+  //         // Update the alarm in DB with the new status/times
+  //         await this.handleAlarmUpdate(alarm);
+  
+  //         // If it's an ACTION alarm turning ON => handle action
+  //         if (alarm.type === AlarmsTypes.ACTION && alarm.status === AlarmStatusEnum.ON) {
+  //           await this.handleAlarmAction(alarm);
+  //         }
+  
+  //         // 4) If alarm is flagged to remove => DELETE from DB & remove from memory
+  //         if (alarm.toremove) {
+  //           // Remove from DB
+  //           await this.prisma.alarm.delete({ where: { id: alarm.id } });
+            
+  //           // Remove from in-memory array
+  //           groupAlarms.splice(i, 1);
+  
+  //           // Because we removed it from the array, no further processing needed
+  //           continue;
+  //         }
+  //       }
+  //     }
+  //   }
+  
+  //   return anyChange;
+  // }
+  
+  async processAlarms(): Promise<boolean> {
+    console.log("🔄 Checking alarms...");
+    let anyChange = false;
+    const currentTime = Date.now();
+  
+    // Iterate over each group of alarms
+    for (const nameKey in this.alarms) {
+      const groupAlarms = this.alarms[nameKey];
+      for (let i = groupAlarms.length - 1; i >= 0; i--) {
+        const alarm = groupAlarms[i];
+        if (!alarm.isEnabled) continue;
+      console.log(`Group: "${nameKey}" has ${groupAlarms.length} alarms.`);
 
-        // 2) check transitions
-        const currentTime = Date.now();
+        // Use the tag value directly from alarm.tag (which should be up-to-date)
+        let tagValue: number | null = null;
+        if (alarm.tag && alarm.tag.value !== undefined && alarm.tag.value !== null) {
+          tagValue = parseFloat(alarm.tag.value);
+        }
+  
         const changed = await alarm.check(currentTime, tagValue);
-
-        // 3) if changed => update in DB and handle actions
+  
         if (changed) {
           anyChange = true;
           await this.handleAlarmUpdate(alarm);
           if (alarm.type === AlarmsTypes.ACTION && alarm.status === AlarmStatusEnum.ON) {
-            // If it's an ACTION alarm turning ON => handle action
             await this.handleAlarmAction(alarm);
           }
           if (alarm.toremove) {
-            // If alarm is flagged for remove => reset
-            alarm.init();
-            // Also persist reset if you want
-            await this.handleAlarmUpdate(alarm);
+            await this.prisma.alarm.delete({ where: { id: alarm.id } });
+            groupAlarms.splice(i, 1);
+            continue;
           }
         }
       }
     }
     return anyChange;
   }
-
-  /**
-   * Persist alarm changes in DB
-   */
+  
+  
   private async handleAlarmUpdate(alarm: Alarm): Promise<void> {
-    // Update alarm status in DB
+    // 1) Update alarm row in DB
     await this.prisma.alarm.update({
       where: { id: alarm.id },
       data: {
@@ -432,9 +574,48 @@ class AlarmsManager {
         userack: alarm.userack,
         isEnabled: alarm.isEnabled,
       },
-    });
-  }
+      include: { tag: true },
 
+    });
+  
+    // 2) If you want a new row for each new ON cycle, you’ll typically do an upsert on (alarmId, ontime)
+    //    If your schema has:
+    //    @@unique([alarmId, ontime], name: "alarmId_ontime")
+    //    Then do something like:
+  
+    const ontimeDate = alarm.ontime ? new Date(alarm.ontime) : null;
+    if (ontimeDate) {
+      await this.prisma.alarmHistory.upsert({
+        where: {
+          // This property name must match the one generated by Prisma.
+          // Possibly 'alarmId_ontime' or 'AlarmHistory_alarmId_ontime_key', etc.
+          alarmId_ontime: {
+            alarmId: alarm.id,
+            ontime: ontimeDate,
+          },
+        },
+        create: {
+          alarmId: alarm.id,
+          name: alarm.name,
+          type: alarm.type,
+          status: alarm.status,
+          text: alarm.subproperty?.text || "",
+          group: alarm.subproperty?.group || "",
+          ontime: ontimeDate,
+          offtime: alarm.offtime ? new Date(alarm.offtime) : null,
+          acktime: alarm.acktime ? new Date(alarm.acktime) : null,
+          userack: alarm.userack || null,
+        },
+        update: {
+          status: alarm.status,
+          offtime: alarm.offtime ? new Date(alarm.offtime) : null,
+          acktime: alarm.acktime ? new Date(alarm.acktime) : null,
+          userack: alarm.userack || null,
+        },
+      });
+    }
+  }
+  
   /**
    * If the alarm is an ACTION type, handle the logic (similar to `_checkActions`).
    */
@@ -540,6 +721,8 @@ class AlarmsManager {
    */
   getAlarmsValues() {
     const activeAlarms: any[] = [];
+    console.log (`[Alarms] activeAlarms=${activeAlarms.length}`);
+
     for (const nameKey in this.alarms) {
       for (const alarm of this.alarms[nameKey]) {
         if (alarm.status === AlarmStatusEnum.ON) {
@@ -562,7 +745,7 @@ class AlarmsManager {
    */
  // alarmManager.ts
 
-async setAlarmAck(alarmId: string, user: string): Promise<boolean> {
+async setAlarmAck(alarmId:string, username:string): Promise<boolean> {
   let changed = false;
 
   // In the manager, you presumably have something like:
@@ -575,7 +758,7 @@ async setAlarmAck(alarmId: string, user: string): Promise<boolean> {
         // Check if alarm even needs ACK
         if (alarm.isToAck() > 0) {
           // Acknowledge
-          alarm.setAck(user);
+          alarm.setAck(username);
           // Update DB or any other side effect
           await this.handleAlarmUpdate(alarm);
           changed = true;

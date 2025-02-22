@@ -2,8 +2,8 @@
 
 import { PrismaClient,Device,Tag ,Alarm} from '@prisma/client';
 import deviceManager from './runtime/devices/deviceManager';
-import alarmManager from './runtime/alarms/alarmmanager';
 
+import  alarmManager from './runtime/alarms/alarmmanager';
 
 
 
@@ -67,105 +67,96 @@ const prisma = new PrismaClient().$extends({
 
 
     
-    tag: {
-      async $allOperations({ operation, args, query }) {
-        console.log(`📡 Intercepted operation on Tag: ${operation}`);
-        console.log("🔎 Arguments:", args);
+  tag: {
+  async $allOperations({ operation, args, query }) {
+    console.log(`📡 Intercepted operation on Tag: ${operation}`);
+    console.log("🔎 Arguments:", args);
 
-        let prevTag: Tag | null = null;
+    let prevTag: Tag | null = null;
 
-        try {
-          if (operation === "update") {
-            const tagId = args.where?.id;
-
-            if (tagId) {
-              prevTag = await prisma.tag.findUnique({ where: { id: tagId } });
-            } else {
-              console.warn("⚠️ No `id` provided in `where` clause for update operation.");
-            }
-          }
-
-          const result = await query(args);
-
-          if (operation === "update") {
-            const updatedTag = result as Tag;
-
-            if (prevTag) {
-              console.log(`🔄 Tag updated: ${updatedTag.id}`);
-              console.log(`📌 Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
-
-              if (prevTag.value !== updatedTag.value) {
-                console.log(`⚡ Tag value changed! Fetching updated tag and reprocessing alarms...`);
-                
-                // Fetch updated tag values before triggering alarm checks
-                const latestTag = await prisma.tag.findUnique({ where: { id: updatedTag.id } });
-
-                if (latestTag) {
-                  console.log(`✅ Latest Tag Value: ${latestTag.value}`);
-                  alarmManager.processAlarms(); // Trigger alarm checks
-                } else {
-                  console.warn(`⚠️ Could not fetch latest tag value for ${updatedTag.id}`);
-                }
-              }
-            } else {
-              console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
-            }
-          }
-
-          return result;
-        } catch (err) {
-          console.error("❌ Error in Prisma middleware:", err);
-          throw err;
+    try {
+      if (operation === "update") {
+        const tagId = args.where?.id;
+        if (tagId) {
+          prevTag = await prisma.tag.findUnique({ where: { id: tagId } });
+        } else {
+          console.warn("⚠️ No `id` provided in `where` clause for update operation.");
         }
-      },
-    },
+      }
+
+      const result = await query(args);
+
+      if (operation === "update") {
+        const updatedTag = result as Tag;
+        if (prevTag) {
+          console.log(`🔄 Tag updated: ${updatedTag.id}`);
+          console.log(`📌 Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
+          if (prevTag.value !== updatedTag.value) {
+            console.log(`⚡ Tag value changed! Updating alarms for tag ${updatedTag.id}...`);
+            // Instead of processing all alarms, update only those related to this tag.
+            alarmManager.updateAlarmsByTag(updatedTag);
+          }
+        } else {
+          console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
+        }
+      }
+      return result;
+    } catch (err) {
+      console.error("❌ Error in Prisma middleware:", err);
+      throw err;
+    }
+  },
+},
+
   
-  alarm: {
-    async $allOperations({ operation, args, query }) {
-      console.log(`🚨 Intercepted operation on Alarm: ${operation}`);
-      console.log("Arguments:", args);
-  
-      let prevAlarm: Alarm | null = null;
-  
-      try {
+    alarm: {
+      async $allOperations({ operation, args, query }) {
+        console.log("Arguments:", args);
+    
+        let prevAlarm: Alarm | null = null;
+    
+        // Fetch previous state on update if available.
         if (operation === "update") {
+
           const alarmId = args.where?.id;
           if (alarmId) {
             prevAlarm = await prisma.alarm.findUnique({
               where: { id: alarmId },
-              include: {
-                tag: true, // Ensure tag data is included
-                alarmHistories: true, // Include related alarm histories
-              },
             });
           }
         }
-  
+    
         const result = await query(args);
-  
-        if (operation === "update") {
-          const updatedAlarm = result as Alarm;
-
-          if (prevAlarm) {
-            console.log(`alarm updated with ID: ${updatedAlarm.id}`);
-            deviceManager.handleDeviceUpdated(updatedAlarm, prevAlarm);
-          } else {
-            console.warn(`No previous state found for device with ID: ${args.where?.id}`);
+    
+        try {
+          if (operation === "create") {
+            const newAlarm = result as Alarm;
+            console.log(`✅ Alarm created with ID: ${newAlarm.id}`);
+            alarmManager.addOrUpdateAlarmInMemory(newAlarm);
+          } else if (operation === "update") {
+            const updatedAlarm = result as Alarm;
+            console.log(`♻ Alarm updated with ID: ${updatedAlarm.id}`);
+            // Always update the in-memory state, regardless of prevAlarm
+            alarmManager.addOrUpdateAlarmInMemory(updatedAlarm);
+          } else if (operation === "delete") {
+            const deletedAlarmId = args.where?.id;
+            if (deletedAlarmId) {
+              console.log(`❌ Alarm deleted with ID: ${deletedAlarmId}`);
+              alarmManager.removeAlarmInMemory(deletedAlarmId);
+            }
           }
+        } catch (err) {
+          console.error("Error syncing alarm changes to AlarmManager:", err);
         }
-
+    
         return result;
-      } catch (err) {
-        console.error('Error in Prisma middleware:', err);
-        throw err;
-      }
-    },
-  },
-}
+      },
+    }
+    
 
 
 
-
+  }
   
   
 });

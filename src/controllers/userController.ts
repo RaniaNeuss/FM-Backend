@@ -411,7 +411,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 
 
 // Controller: Edit User
-export const editUser = async (req: Request, res: Response): Promise<void> => {
+export const editProfile = async (req: Request, res: Response): Promise<void> => {
     try {
    
 
@@ -522,6 +522,122 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
+export const editUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+   
+
+    
+
+       // Retrieve userId from session
+        const userId = req.userId;   
+        const id =req.params.id;
+
+
+       if (!userId) {
+           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+           return;
+
+       }        
+       
+       if (!id) {
+        res.status(400).json({
+            error: "validation_error",
+            message: "User ID is required.",
+        });
+        return;
+    }
+
+
+    // Check if the user exists
+    const user = await prisma.user.findUnique({
+        where: {  id: String(id) },
+    });
+
+    if (!user) {
+        res.status(404).json({
+            error: "not_found",
+            message: `User with ID ${id} not found.`,
+        });
+        return;
+    }
+
+
+       const {email, name, info,username,password ,group} = req.body; 
+    
+    
+        
+       const existingGroup = await prisma.group.findUnique({ where: { name: group } });
+       if (!existingGroup) {
+            console.warn(`User creation failed: group "${group}" does not exist`);
+           res.status(404).json({ error: "not_found", message: `Group "${group}" does not exist` });
+           return;
+       }
+
+        // if ( typeof username !== "string") {
+        //     console.warn("Validation failed: username is missing or invalid");
+        //     res.status(400).json({ error: "validation_error", message: "Valid username is required" });
+        //     return;
+        // }
+
+    
+        // if ( typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        //      console.warn("Validation failed: email is missing or invalid");
+        //     res.status(400).json({ error: "validation_error", message: "Valid email is required" });
+        //     return;
+        // }
+
+        // if (typeof password !== "string" || password.length < 6) {
+        //      console.warn("Validation failed: password is missing or too short");
+        //     res.status(400).json({ error: "validation_error", message: "Password must be at least 6 characters long" });
+        //     return;
+        // }
+
+        // if ( typeof group !== "string") {
+        //      console.warn("Validation failed: group is missing or invalid");
+        //     res.status(400).json({ error: "validation_error", message: "Valid group is required" });
+        //     return;
+        // }
+
+        // // Validate `info`
+        // if (info && typeof info !== "string") {
+        //     res.status(400).json({
+        //         error: "validation_error",
+        //         message: "Info must be a valid string.",
+        //     });
+        //     return;
+        // }
+
+
+        // Check if the group exists
+    
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        // Update the user in the database
+        const updatedUser = await prisma.user.update({
+            where: {  id: String(userId) },
+            data: {
+                email, name, info,username
+                ,  password: hashedPassword,
+                groups: {
+                    connect: [{ id: existingGroup.id }],
+                },
+
+                updatedAt: new Date(),
+            },
+        });
+
+        res.status(200).json({
+            message: "User updated successfully.",
+            user: updatedUser,
+        });
+    } catch (err: any) {
+        console.error(`Failed to edit user with ID ${req.params.id}: ${err.message}`);
+        res.status(500).json({
+            error: "unexpected_error",
+            message: "An error occurred while updating the user.",
+        });
+    }
+};
 
 
 // Controller: Delete User

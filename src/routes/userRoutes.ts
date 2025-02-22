@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUsers,refreshtoken, Register,createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editUser } from '../controllers/userController';
+import { getUsers,refreshtoken,editUser, Register,createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editProfile } from '../controllers/userController';
 import passport from "passport";
 import jwt from "jsonwebtoken";
 import session from 'express-session';
@@ -42,7 +42,8 @@ router.post('/',authenticateUser, createUser);
 router.post('/register', Register);
 router.delete('/:id',authenticateUser, deleteUser);
 router.get('/:id',authenticateUser, getUser);
-router.put('/',authenticateUser, editUser);
+router.put('/',authenticateUser, editProfile);
+router.put('/:id',authenticateUser, editUser);
 
 
 

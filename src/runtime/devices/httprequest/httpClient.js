@@ -219,13 +219,19 @@ function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
       /**
        * Return Tag value { id: <name>, value: <value>, ts: <lastTimestampValue> }
        */
-      this.getValue = function (id) {
-        if (varsValue[id]) {
-          return { id: id, value: varsValue[id].value, ts: lastTimestampValue };
+      // this.getValue = function (id) {
+      //   if (varsValue[id]) {
+      //     return { id: id, value: varsValue[id].value, ts: lastTimestampValue };
+      //   }
+      //   return null;
+      // };
+      this.getDeviceValue = function (deviceId, tagId) {
+        if (varsValueCache.has(deviceId)) {
+            const deviceVars = varsValueCache.get(deviceId);
+            return deviceVars[tagId] || null;
         }
         return null;
-      };
-    
+    };
       /**
        * Return Tags values array { id: <name>, value: <value>, type: <type> }
        */
@@ -427,65 +433,109 @@ function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
 
 const varsValueCache = new Map(); // Key: deviceId, Value: varsValue map for each device
 
+// const _updateVarsValue = async (reqdata, deviceId, io) => {
+//   // console.log(`_updateVarsValue called with deviceId: ${deviceId}`); // Log the deviceId
+
+//   const timestamp = new Date().getTime();
+
+//   // Flatten and normalize the data
+//   const flatData = dataToFlat(reqdata, apiProperty);
+
+//   // Get or initialize varsValue for this device
+//   if (!varsValueCache.has(deviceId)) {
+//       varsValueCache.set(deviceId, {}); // Initialize empty cache for this device
+//   }
+//   const varsValue = varsValueCache.get(deviceId);
+
+//   const changed = {}; // To store only tags that have changed
+//   const allTags = {}; // To store all tags (changed and unchanged)
+
+//   // Process each flattened key-value pair
+//   for (const [key, newValue] of Object.entries(flatData)) {
+//       const oldValue = varsValue[key]?.value; // Get the previous value
+
+//       // Add all tags to the `allTags` object
+//       allTags[key] = {
+//           value: String(newValue),
+//           timestamp: varsValue[key]?.timestamp || timestamp, // Use existing timestamp if unchanged
+//           changed: oldValue !== String(newValue), // Flag to indicate if value changed
+//       };
+
+//       // Update only if the value has changed
+//       if (oldValue !== String(newValue)) {
+//           // Update the varsValue cache only for changed values
+//           varsValue[key] = {
+//               value: String(newValue),
+//               timestamp,
+//           };
+
+//           // Add to the `changed` object
+//           changed[key] = {
+//               value: String(newValue),
+//               timestamp,
+//           };
+
+//           // console.log(`Value changed for '${key}':`, {
+//           //     oldValue,
+//           //     newValue: String(newValue),
+//           // });
+//       }
+//   }
+
+
+
+
+//   // Emit all tags to the frontend (both changed and unchanged)
+//   io.emit('variable-changes', {
+//       deviceId,
+//       changes: allTags, // Emit the full state with the `changed` flag
+//   });
+
+//   // Return only the changed tags
+//   return changed;
+// };
+
 const _updateVarsValue = async (reqdata, deviceId, io) => {
-  // console.log(`_updateVarsValue called with deviceId: ${deviceId}`); // Log the deviceId
-
   const timestamp = new Date().getTime();
-
-  // Flatten and normalize the data
   const flatData = dataToFlat(reqdata, apiProperty);
 
-  // Get or initialize varsValue for this device
   if (!varsValueCache.has(deviceId)) {
-      varsValueCache.set(deviceId, {}); // Initialize empty cache for this device
+      varsValueCache.set(deviceId, {}); // Initialize memory for this device
   }
   const varsValue = varsValueCache.get(deviceId);
 
-  const changed = {}; // To store only tags that have changed
-  const allTags = {}; // To store all tags (changed and unchanged)
+  const changed = {}; 
+  const allTags = {}; 
 
-  // Process each flattened key-value pair
   for (const [key, newValue] of Object.entries(flatData)) {
-      const oldValue = varsValue[key]?.value; // Get the previous value
+      const oldValue = varsValue[key]?.value;
 
-      // Add all tags to the `allTags` object
       allTags[key] = {
           value: String(newValue),
-          timestamp: varsValue[key]?.timestamp || timestamp, // Use existing timestamp if unchanged
-          changed: oldValue !== String(newValue), // Flag to indicate if value changed
+          timestamp: varsValue[key]?.timestamp || timestamp,
+          changed: oldValue !== String(newValue),
       };
 
-      // Update only if the value has changed
       if (oldValue !== String(newValue)) {
-          // Update the varsValue cache only for changed values
           varsValue[key] = {
               value: String(newValue),
               timestamp,
           };
 
-          // Add to the `changed` object
           changed[key] = {
               value: String(newValue),
               timestamp,
           };
-
-          // console.log(`Value changed for '${key}':`, {
-          //     oldValue,
-          //     newValue: String(newValue),
-          // });
       }
   }
 
-  // Emit all tags to the frontend (both changed and unchanged)
   io.emit('variable-changes', {
       deviceId,
-      changes: allTags, // Emit the full state with the `changed` flag
+      changes: allTags,
   });
 
-  // Return only the changed tags
   return changed;
 };
-
 
 
 

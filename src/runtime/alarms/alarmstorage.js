@@ -39,65 +39,6 @@ export async function clearAlarms(all) {
 
 
 
-/**
- * Acknowledge an alarm
- * @param {string} id - The ID of the alarm
- * @param {string} userId - The ID of the user acknowledging the alarm
- */
-// export async function setAlarmAck(id, userId) {
-//   try {
-//     // Fetch the username from the user ID
-//     const user = await prisma.user.findUnique({
-//       where: { id: userId },
-//       select: { username: true }, // Only fetch the username
-//     });
-
-//     if (!user) {
-//       throw new Error(`No user found with ID '${userId}'`);
-//     }
-
-//     const currentTime = new Date();
-
-//     // Update the alarm
-//     const result = await prisma.alarm.updateMany({
-//       where: {
-//         id: id,
-//         acktime: null, // Only check for null values
-//       },
-//       data: {
-//         acktime: currentTime,
-//         status: "ACK",
-//         userack: user.username, // Set the username instead of user ID
-//       },
-//     });
-
-//     if (result.count === 0) {
-//       throw new Error(`No alarm found with ID '${id}' to acknowledge or already acknowledged.`);
-//     }
-
-//     // Also update alarm history
-//     const historyUpdate = await prisma.alarmHistory.updateMany({
-//       where: {
-//         alarmId: id,
-//         acktime: null, // Only update if not already acknowledged
-//       },
-//       data: {
-//         acktime: currentTime,
-//         status: "ACK",
-//         userack: user.username,
-//       },
-//     });
-
-//     console.log(`✅ Alarm and alarm history updated successfully for ID: ${id}`);
-
-//     return true;
-//   } catch (err) {
-//     const errorMessage = `alarmsstorage.setAlarmAck failed: ${err.message}`;
-//     console.error(errorMessage);
-//     throw new Error(errorMessage);
-//   }
-// }
-
 
 /**
  * Fetch all active alarms from the database
@@ -129,13 +70,13 @@ export async function getAlarmsHistory(from, to) {
       // Fetch the alarm history from the database using Prisma
       const history = await prisma.alarmHistory.findMany({
         where: {
-          onTime: {
+          ontime: {
             gte: new Date(start),
             lte: new Date(end),
           },
         },
         orderBy: {
-          onTime: 'desc',
+          ontime: 'desc',
         },
       });
 
@@ -154,65 +95,92 @@ export async function getAlarmsHistory(from, to) {
  * Add or update alarm records in the database
  * @param {Array} alarms - List of alarms to insert or update
  */
-export async function setAlarms(alarms) {
-  try {
-    for (const alr of alarms) {
-      const status = alr.status || '';
-      const userAck = alr.userAck || '';
+/**
+ * Upsert alarms in the database using Prisma.
+ * - Updates status, ontime, offtime, acktime if alarm exists.
+ * - Creates a new alarm if it doesn't exist.
+ * - Stores historical data in `chronicle` (optional).
+ * - Removes alarms marked for deletion.
+ */
+async function setAlarms(alarms) {
+    if (!alarms || alarms.length === 0) return;
 
-      // Ensure projectId is provided for creating alarms
-      if (!alr.projectId) {
-        throw new Error(`Project ID is required for alarm: ${JSON.stringify(alr)}`);
-      }
+    try {
+        // Use Prisma transaction to handle batch operations
+        await prisma.$transaction(
+            alarms.map(alr => {
+                const { name, type, status, ontime, offtime, acktime, toremove } = alr;
+                const subproperty = alr.subproperty ? JSON.stringify(alr.subproperty) : "{}";
+                const userack = alr.userack || "";
+                const grp = alr.subproperty?.group || "";
+                const text = alr.subproperty?.text || "";
 
-      await prisma.alarm.upsert({
-        where: { id: alr.id }, // Use `id` directly if `alr.getId()` is undefined
-        create: {
-          id: alr.id,
-          type: alr.type,
-          status: status,
-          ontime: alr.ontime,
-          offtime: alr.offtime,
-          acktime: alr.acktime,
-          project: {
-            connect: {
-              id: alr.projectId, // Connect to the existing project using projectId
-            },
-          },
-        },
-        update: {
-          type: alr.type,
-          status: status,
-          ontime: alr.ontime,
-          offtime: alr.offtime,
-          acktime: alr.acktime,
-        },
-      });
+                if (toremove) {
+                    // If the alarm is marked for removal, delete it
+                    return prisma.alarm.deleteMany({
+                        where: { id: alr.id },
+                    });
+                }
 
-      console.log(`Alarm ${alr.id} upserted successfully.`);
+                // Upsert logic for the `alarms` table
+                return prisma.alarm.upsert({
+                    where: { id: alr.id }, // Primary key-based upsert
+                    update: { status, ontime, offtime, acktime },
+                    create: {
+                        id: alr.id,
+                        name,
+                        type,
+                        status,
+                        ontime,
+                        offtime,
+                        acktime,
+                        subproperty,
+                        isEnabled: alr.isEnabled,
+                        projectId: alr.projectId || null, // Ensure projectId is set correctly
+                    },
+                });
+            })
+        );
 
-      // Insert into alarm history
-      await prisma.alarmHistory.create({
-        data: {
-          alarmId: alr.id,
-          type: alr.type,
-          status: status,
-          text: alr.subproperty?.text || '',
-          ontime: alr.ontime,
-          offtime: alr.offtime,
-          acktime: alr.acktime,
-          userack: userack,
-        },
-      });
+        // Insert into `chronicle` for history tracking (optional)
+        await prisma.$transaction(
+            alarms.map(alr => {
+                if (alr.ontime) {
+                    return prisma.alarmHistory.upsert({
+                        where: {
+                            alarmId_ontime: {
+                                alarmId: alr.id,
+                                ontime: alr.ontime,
+                            },
+                        },
+                        create: {
+                            alarmId: alr.id,
+                            name: alr.name,
+                            type: alr.type,
+                            status: alr.status,
+                            text,
+                            group: grp,
+                            ontime: alr.ontime,
+                            offtime: alr.offtime,
+                            acktime: alr.acktime,
+                            userack,
+                        },
+                        update: {
+                            status: alr.status,
+                            offtime: alr.offtime,
+                            acktime: alr.acktime,
+                            userack,
+                        },
+                    });
+                }
+            }).filter(Boolean) // Remove `undefined` entries
+        );
 
-      console.log(`History for alarm ${alr.id} created successfully.`);
+        console.log("✅ Alarms successfully set in DB.");
+    } catch (error) {
+        console.error("❌ Error setting alarms:", error);
+        throw error;
     }
-
-    return true;
-  } catch (err) {
-    console.error('Error in setAlarms:', err);
-    throw new Error(`alarmsstorage.setAlarms failed: ${err.message}`);
-  }
 }
 
 
