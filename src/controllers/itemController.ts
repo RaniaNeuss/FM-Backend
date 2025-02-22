@@ -422,10 +422,11 @@ export const updateItem = async (req: Request, res: Response): Promise<void> => 
                 tagId,
                 variables: {
                     deleteMany: {}, // Remove existing variables
-                    create: variables?.map((variable: { name: string; type: string; value: string }) => ({
+                    create: variables?.map((variable: { name: string; type: string; value: string ;property :string }) => ({
                         name: variable.name,
                         type: variable.type,
                         value: variable.value,
+                        property: variable.property
                     })),
                 },
             },
