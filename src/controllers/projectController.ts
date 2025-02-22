@@ -60,76 +60,7 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
 };
 
 
-export const assignUsersToProject = async (req: Request, res: Response): Promise<void> => {
-    try {
-        console.log('Session Data:', req.session);
 
-        const userId = req.userId; // Logged-in user
-        console.log('userId:', userId);
-
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
-
-        const { projectId } = req.params;
-        const { userIds } = req.body;
-
-        if (!projectId) {
-            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
-            return;
-        }
-
-        if (!Array.isArray(userIds) || userIds.length === 0) {
-            res.status(400).json({ error: 'validation_error', message: 'User IDs must be a non-empty array.' });
-            return;
-        }
-
-        // Check if the logged-in user is the owner of the project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-        });
-
-        if (!project) {
-            res.status(404).json({
-                error: 'not_found',
-                message: `Project with ID ${projectId} not found.`,
-            });
-            return;
-        }
-
-        if (project.userId !== userId) {
-            res.status(403).json({
-                error: 'forbidden',
-                message: 'You do not have permission to modify this project.',
-            });
-            return;
-        }
-
-        // Connect new users to the project
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    connect: userIds.map((id) => ({ id })), // Add new users
-                },
-            },
-        });
-
-        console.info(`Users added to project ${projectId} successfully.`);
-        res.status(200).json({
-            message: 'Users assigned to the project successfully.',
-            projectId,
-            addedUsers: userIds,
-        });
-    } catch (err: any) {
-        console.error(`Failed to assign users to project ${req.params.projectId}: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: 'An error occurred while assigning users to the project.',
-        });
-    }
-};
 
 
 // Controller: Get Users by Project ID
@@ -190,135 +121,10 @@ export const getUsersByProjectId = async (req: Request, res: Response): Promise<
 };
 
 // Controller: Edit Assigned Users in a Project (Replace Existing Users)
-export const editAssignedUsers = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const userId = req.userId; // Logged-in user
-        const { projectId } = req.params;
-        const { userIds } = req.body; // New list of user IDs to assign
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
-
-        if (!projectId) {
-            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
-            return;
-        }
-
-        if (!Array.isArray(userIds)) {
-            res.status(400).json({ error: 'validation_error', message: 'User IDs must be an array.' });
-            return;
-        }
-
-        // Check if the logged-in user is the owner of the project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-        });
-
-        if (!project) {
-            res.status(404).json({ error: 'not_found', message: 'Project not found.' });
-            return;
-        }
-
-        if (project.userId !== userId) {
-            res.status(403).json({
-                error: 'forbidden',
-                message: 'You do not have permission to edit assigned users in this project.',
-            });
-            return;
-        }
-
-        // Update assigned users (replace existing users with the new list)
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    set: [], // Remove all existing users
-                    connect: userIds.map((id) => ({ id })), // Add new users
-                },
-            },
-        });
-
-        console.info(`Updated assigned users for project ${projectId}.`);
-        res.status(200).json({
-            message: 'Assigned users updated successfully.',
-            projectId,
-            updatedUsers: userIds,
-        });
-    } catch (err: any) {
-        console.error(`Failed to edit assigned users for project ${req.params.projectId}: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: 'An error occurred while editing assigned users.',
-        });
-    }
-};
 
 // Controller: Remove Assigned Users from a Project
-export const removeAssignedUsers = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const userId = req.userId; // Logged-in user
-        const { projectId } = req.params;
-        const { userIds } = req.body; // List of users to remove
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
-
-        if (!projectId) {
-            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
-            return;
-        }
-
-        if (!Array.isArray(userIds) || userIds.length === 0) {
-            res.status(400).json({ error: 'validation_error', message: 'User IDs must be a non-empty array.' });
-            return;
-        }
-
-        // Check if the logged-in user is the owner of the project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-        });
-
-        if (!project) {
-            res.status(404).json({ error: 'not_found', message: 'Project not found.' });
-            return;
-        }
-
-        if (project.userId !== userId) {
-            res.status(403).json({
-                error: 'forbidden',
-                message: 'You do not have permission to remove users from this project.',
-            });
-            return;
-        }
-
-        // Remove users from the project
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    disconnect: userIds.map((id) => ({ id })), // Remove specific users
-                },
-            },
-        });
-
-        console.info(`Removed users from project ${projectId}.`);
-        res.status(200).json({
-            message: 'Users removed successfully.',
-            projectId,
-            removedUsers: userIds,
-        });
-    } catch (err: any) {
-        console.error(`Failed to remove users from project ${req.params.projectId}: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: 'An error occurred while removing users from the project.',
-        });
-    }
-};
 
 
 // Controller: Fetch All Projects
@@ -482,8 +288,6 @@ export const updateProjectData = async (req: Request, res: Response): Promise<vo
 
 
 
-
-
 export const deleteProject = async (req: Request, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
@@ -524,8 +328,205 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
 
 
 
+export const assignUsersToProject = async (req: Request, res: Response): Promise<void> => {
+    try {
+        console.log('Session Data:', req.session);
 
+        const userId = req.userId; // Logged-in user
+        console.log('userId:', userId);
 
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+            return;
+        }
+
+        const { projectId } = req.params;
+        const { userIds } = req.body;
+
+        if (!projectId) {
+            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
+            return;
+        }
+
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            res.status(400).json({ error: 'validation_error', message: 'User IDs must be a non-empty array.' });
+            return;
+        }
+
+        // Check if the logged-in user is the owner of the project
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+        });
+
+        if (!project) {
+            res.status(404).json({
+                error: 'not_found',
+                message: `Project with ID ${projectId} not found.`,
+            });
+            return;
+        }
+
+        if (project.userId !== userId) {
+            res.status(403).json({
+                error: 'forbidden',
+                message: 'You do not have permission to modify this project.',
+            });
+            return;
+        }
+
+        // Connect new users to the project
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                users: {
+                    connect: userIds.map((id) => ({ id })), // Add new users
+                },
+            },
+        });
+
+        console.info(`Users added to project ${projectId} successfully.`);
+        res.status(200).json({
+            message: 'Users assigned to the project successfully.',
+            projectId,
+            addedUsers: userIds,
+        });
+    } catch (err: any) {
+        console.error(`Failed to assign users to project ${req.params.projectId}: ${err.message}`);
+        res.status(500).json({
+            error: 'unexpected_error',
+            message: 'An error occurred while assigning users to the project.',
+        });
+    }
+};
+
+export const editAssignedUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.userId; // Logged-in user
+        const { projectId } = req.params;
+        const { userIds } = req.body; // New list of user IDs to assign
+
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+            return;
+        }
+
+        if (!projectId) {
+            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
+            return;
+        }
+
+        if (!Array.isArray(userIds)) {
+            res.status(400).json({ error: 'validation_error', message: 'User IDs must be an array.' });
+            return;
+        }
+
+        // Check if the logged-in user is the owner of the project
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+        });
+
+        if (!project) {
+            res.status(404).json({ error: 'not_found', message: 'Project not found.' });
+            return;
+        }
+
+        if (project.userId !== userId) {
+            res.status(403).json({
+                error: 'forbidden',
+                message: 'You do not have permission to edit assigned users in this project.',
+            });
+            return;
+        }
+
+        // Update assigned users (replace existing users with the new list)
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                users: {
+                    set: [], // Remove all existing users
+                    connect: userIds.map((id) => ({ id })), // Add new users
+                },
+            },
+        });
+
+        console.info(`Updated assigned users for project ${projectId}.`);
+        res.status(200).json({
+            message: 'Assigned users updated successfully.',
+            projectId,
+            updatedUsers: userIds,
+        });
+    } catch (err: any) {
+        console.error(`Failed to edit assigned users for project ${req.params.projectId}: ${err.message}`);
+        res.status(500).json({
+            error: 'unexpected_error',
+            message: 'An error occurred while editing assigned users.',
+        });
+    }
+};
+
+export const removeAssignedUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.userId; // Logged-in user
+        const { projectId } = req.params;
+        const { userIds } = req.body; // List of users to remove
+
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+            return;
+        }
+
+        if (!projectId) {
+            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
+            return;
+        }
+
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            res.status(400).json({ error: 'validation_error', message: 'User IDs must be a non-empty array.' });
+            return;
+        }
+
+        // Check if the logged-in user is the owner of the project
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+        });
+
+        if (!project) {
+            res.status(404).json({ error: 'not_found', message: 'Project not found.' });
+            return;
+        }
+
+        if (project.userId !== userId) {
+            res.status(403).json({
+                error: 'forbidden',
+                message: 'You do not have permission to remove users from this project.',
+            });
+            return;
+        }
+
+        // Remove users from the project
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                users: {
+                    disconnect: userIds.map((id) => ({ id })), // Remove specific users
+                },
+            },
+        });
+
+        console.info(`Removed users from project ${projectId}.`);
+        res.status(200).json({
+            message: 'Users removed successfully.',
+            projectId,
+            removedUsers: userIds,
+        });
+    } catch (err: any) {
+        console.error(`Failed to remove users from project ${req.params.projectId}: ${err.message}`);
+        res.status(500).json({
+            error: 'unexpected_error',
+            message: 'An error occurred while removing users from the project.',
+        });
+    }
+};
 
 
 

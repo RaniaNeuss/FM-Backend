@@ -15,8 +15,6 @@ declare global {
 
 
 
-
-
 // Controller: Create User
 export const createUser = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -352,7 +350,6 @@ export const logout = (req: Request, res: Response): void => {
         });
     });
 };
-
 
 
 
@@ -774,6 +771,22 @@ function handleError(res: Response, err: any, context: string): void {
         console.error(`${context}: ${err}`);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // export const login = async (req: Request, res: Response): Promise<void> => {
