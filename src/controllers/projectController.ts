@@ -120,10 +120,7 @@ export const getUsersByProjectId = async (req: Request, res: Response): Promise<
     }
 };
 
-// Controller: Edit Assigned Users in a Project (Replace Existing Users)
 
-
-// Controller: Remove Assigned Users from a Project
 
 
 
@@ -327,7 +324,7 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
 };
 
 
-
+//Assigne Users in a Project
 export const assignUsersToProject = async (req: Request, res: Response): Promise<void> => {
     try {
         console.log('Session Data:', req.session);
@@ -398,6 +395,7 @@ export const assignUsersToProject = async (req: Request, res: Response): Promise
         });
     }
 };
+// Controller: Edit Assigned Users in a Project (Replace Existing Users)
 
 export const editAssignedUsers = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -463,6 +461,7 @@ export const editAssignedUsers = async (req: Request, res: Response): Promise<vo
         });
     }
 };
+// Controller: Remove Assigned Users from a Project
 
 export const removeAssignedUsers = async (req: Request, res: Response): Promise<void> => {
     try {

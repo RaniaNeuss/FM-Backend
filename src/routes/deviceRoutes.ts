@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
     createDevice,
-     editDevice,deleteDevice,getDeviceById,getAllDevices,saveTagToDevice,setTankLevel
+     editDevice,deleteDevice,getDeviceById,getAllDevices,saveTagToDevice,setTankLevel,updateTagValue
 } from '../controllers/deviceController';
 
 const router = Router();
@@ -18,6 +18,7 @@ router.post('/tank/:tankId', setTankLevel);
  router.delete('/:id', deleteDevice);
  router.post('/:id/tags', saveTagToDevice);
 
+ router.put("/:deviceId/tags/:tagName", updateTagValue);
 
 
 

@@ -262,7 +262,50 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
       res.status(500).json({ error: 'Failed to save tag to device' });
     }
   };
+// Update an existing tag value in the database
+export const updateTagValue = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { deviceId, name } = req.params;
+    const { value } = req.body;
 
+    if (!deviceId || !name) {
+      res.status(400).json({ error: "Device ID and tag name are required." });
+      return;
+    }
+
+    // Find the tag
+    const tag = await prisma.tag.findFirst({
+      where: {
+        deviceId,
+        name,
+      },
+    });
+
+    if (!tag) {
+      res.status(404).json({ error: "Tag not found." });
+      return;
+    }
+
+    // Update the tag value
+    const updatedTag = await prisma.tag.update({
+      where: {
+        id: tag.id,
+      },
+      data: {
+        value, 
+        updatedAt: new Date(),
+      },
+    });
+
+    res.status(200).json({
+      message: "Tag updated successfully.",
+      tag: updatedTag,
+    });
+  } catch (error) {
+    console.error("Error updating tag value:", error);
+    res.status(500).json({ error: "Failed to update tag value." });
+  }
+};
 
   export const setTankLevel = async (req: Request, res: Response): Promise<void> => {
     try {

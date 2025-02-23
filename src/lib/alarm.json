@@ -1,0 +1,39 @@
+{
+    "actions": {
+        "enabled": false,
+        "values": []
+    },
+    "high": {
+        "ackmode": "ackactive",
+        "bkcolor": "#F9CF59",
+        "color": "#000",
+        "enabled": false
+    },
+    "highhigh": {
+        "ackmode": "ackactive",
+        "bkcolor": "#FF4848",
+        "checkdelay": 3,
+        "color": "#FFF",
+        "enabled": true,
+        "max": 10,
+        "min": 0,
+        "text": "warning",
+        "timedelay": 2
+    },
+    "info": {
+        "ackmode": "float",
+        "bkcolor": "#22A7F2",
+        "color": "#FFF",
+        "enabled": false
+    },
+    "low": {
+        "ackmode": "ackactive",
+        "bkcolor": "#E5E5E5",
+        "color": "#000",
+        "enabled": false
+    },
+    "name": "rania",
+    "property": {
+        "variableId": "t_9b9dd326-74884223"
+    }
+}

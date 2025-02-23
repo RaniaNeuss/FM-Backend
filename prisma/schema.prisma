@@ -155,6 +155,11 @@ model Alarm {
   users          User[]         @relation("AlarmAcknowledgements")
 }
 
+
+
+
+
+
 model AlarmHistory {
   id        String    @id @default(uuid())
   alarmId   String?

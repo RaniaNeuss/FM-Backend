@@ -105,7 +105,7 @@ const getexistingdevices = async () => {
   try {
     const devices = await getexistingdevices();
     await deviceManager.initializeAndPollDevices(devices);
-    await alarmManager.start(); // Start alarm manager
+    // await alarmManager.start(); // Start alarm manager
 
   } catch (error) {
     console.error('Error during server startup:', error);
