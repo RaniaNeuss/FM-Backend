@@ -265,10 +265,10 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
 // Update an existing tag value in the database
 export const updateTagValue = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { deviceId, name } = req.params;
+    const { deviceId, tagName } = req.params;
     const { value } = req.body;
 
-    if (!deviceId || !name) {
+    if (!deviceId || !tagName) {
       res.status(400).json({ error: "Device ID and tag name are required." });
       return;
     }
@@ -277,7 +277,7 @@ export const updateTagValue = async (req: Request, res: Response): Promise<void>
     const tag = await prisma.tag.findFirst({
       where: {
         deviceId,
-        name,
+        name: tagName,
       },
     });
 
