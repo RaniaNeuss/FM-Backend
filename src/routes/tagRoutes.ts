@@ -1,9 +1,9 @@
 import express from 'express';
-import { getAllTags, deleteTag, Createtagtodevice } from '../controllers/tagsController';
+import { getAllTags, deleteTag, saveTagToDevice} from '../controllers/tagsController';
 
 const router = express.Router();
 
 router.get('/', getAllTags);
 router.delete('/:id', deleteTag);
- router.post('/:deviceId',  Createtagtodevice);
+ router.post('/:id/tags',  saveTagToDevice);
 export default router;

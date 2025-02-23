@@ -9,7 +9,47 @@ import axios from 'axios'; // Ensure this is at the top
 
 
 
+// export const saveTagToDevice = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     // Extract deviceId from the URL params and tag details from the request body
+//     const { id: deviceId } = req.params;
+//     const {  label, value, type,address } = req.body;
 
+//     // Validate required fields
+//     if (!deviceId ||  !type) {
+//       res.status(400).json({ error: 'Missing required fields: deviceId, name, or type' });
+//       return;
+//     }
+
+//     // Save or update the tag in the database
+//     const updatedTag = await prisma.tag.upsert({
+//       where: {
+//         deviceId_address: { deviceId, address }, // Composite key for unique identification
+//       },
+//       create: {
+//         deviceId,
+//         address,
+//         label,
+//         value,
+//         type,
+//         createdAt: new Date(),
+//         updatedAt: new Date(),
+//       },
+//       update: {
+//         label,
+//         value,
+//         type,
+//         updatedAt: new Date(),
+//       },
+//     });
+
+//     // Respond with the updated tag
+//     res.status(200).json({ message: 'Tag saved successfully', tag: updatedTag });
+//   } catch (error) {
+//     console.error('Error saving tag to device:', error);
+//     res.status(500).json({ error: 'Failed to save tag to device' });
+//   }
+// };
 
 export const createDevice = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -221,91 +261,51 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
   
 
 
-  export const saveTagToDevice = async (req: Request, res: Response): Promise<void> => {
-    try {
-      // Extract deviceId from the URL params and tag details from the request body
-      const { id: deviceId } = req.params;
-      const { name, label, value, type } = req.body;
   
-      // Validate required fields
-      if (!deviceId || !name || !type) {
-        res.status(400).json({ error: 'Missing required fields: deviceId, name, or type' });
-        return;
-      }
-  
-      // Save or update the tag in the database
-      const updatedTag = await prisma.tag.upsert({
-        where: {
-          deviceId_name: { deviceId, name }, // Composite key for unique identification
-        },
-        create: {
-          deviceId,
-          name,
-          label,
-          value,
-          type,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        update: {
-          label,
-          value,
-          type,
-          updatedAt: new Date(),
-        },
-      });
-  
-      // Respond with the updated tag
-      res.status(200).json({ message: 'Tag saved successfully', tag: updatedTag });
-    } catch (error) {
-      console.error('Error saving tag to device:', error);
-      res.status(500).json({ error: 'Failed to save tag to device' });
-    }
-  };
 // Update an existing tag value in the database
-export const updateTagValue = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { deviceId, tagName } = req.params;
-    const { value } = req.body;
+// export const updateTagValue = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { deviceId, tagName } = req.params;
+//     const { value } = req.body;
 
-    if (!deviceId || !tagName) {
-      res.status(400).json({ error: "Device ID and tag name are required." });
-      return;
-    }
+//     if (!deviceId || !tagName) {
+//       res.status(400).json({ error: "Device ID and tag name are required." });
+//       return;
+//     }
 
-    // Find the tag
-    const tag = await prisma.tag.findFirst({
-      where: {
-        deviceId,
-        name: tagName,
-      },
-    });
+//     // Find the tag
+//     const tag = await prisma.tag.findFirst({
+//       where: {
+//         deviceId,
+//         name: tagName,
+//       },
+//     });
 
-    if (!tag) {
-      res.status(404).json({ error: "Tag not found." });
-      return;
-    }
+//     if (!tag) {
+//       res.status(404).json({ error: "Tag not found." });
+//       return;
+//     }
 
-    // Update the tag value
-    const updatedTag = await prisma.tag.update({
-      where: {
-        id: tag.id,
-      },
-      data: {
-        value, 
-        updatedAt: new Date(),
-      },
-    });
+//     // Update the tag value
+//     const updatedTag = await prisma.tag.update({
+//       where: {
+//         id: tag.id,
+//       },
+//       data: {
+//         value, 
+//         updatedAt: new Date(),
+//       },
+//     });
 
-    res.status(200).json({
-      message: "Tag updated successfully.",
-      tag: updatedTag,
-    });
-  } catch (error) {
-    console.error("Error updating tag value:", error);
-    res.status(500).json({ error: "Failed to update tag value." });
-  }
-};
+//     res.status(200).json({
+//       message: "Tag updated successfully.",
+//       tag: updatedTag,
+//     });
+//   } catch (error) {
+//     console.error("Error updating tag value:", error);
+//     res.status(500).json({ error: "Failed to update tag value." });
+//   }
+// };
 
   export const setTankLevel = async (req: Request, res: Response): Promise<void> => {
     try {

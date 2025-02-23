@@ -2,7 +2,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { Application } from 'express';
 import EventEmitter from 'events';
-
+import prisma from './prismaClient';
 const initializeSocket = (app: Application) => {
   const server = createServer(app);
   const io = new Server(server, {
@@ -16,6 +16,35 @@ const initializeSocket = (app: Application) => {
 
   io.on('connection', (socket) => {
     console.log('New Socket.IO connection established.');
+
+
+// Listen for variable updates and update the database
+socket.on('variable-changes', async ({ deviceId, changes }: { deviceId: string, changes: Record<string, { value: any }> }) => {
+  console.log(`Received updates for device ${deviceId}`, changes);
+
+  for (const [name, { value }] of Object.entries(changes)) {
+    try {
+      const existingTag = await prisma.tag.findFirst({
+        where: { deviceId, name },
+      });
+
+      if (existingTag) {
+        await prisma.tag.update({
+          where: { id: existingTag.id },
+          data: { value, updatedAt: new Date() }
+        });
+        console.log(`✅ Updated tag '${name}' in database.`);
+      } else {
+        console.log(`⚠️ Tag '${name}' not found in database.`);
+      }
+    } catch (error) {
+      console.error(`❌ Error updating tag '${name}':`, error);
+    }
+  }
+});
+
+
+
 
     // Handle client disconnect
     socket.on('disconnect', () => {

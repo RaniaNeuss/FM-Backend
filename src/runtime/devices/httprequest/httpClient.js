@@ -39,11 +39,18 @@ function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
       if (!device || device.id !== deviceId) {
         device = await prisma.device.findUnique({
           where: { id: deviceId },
-          include: { tags: true },
+          include: { tags: true }, // Ensure tags are fetched
         });
+    
+        // Debugging: Log fetched device and its tags
+        console.log(`Fetched device:`, device);
+        if (device?.tags) {
+          console.log(`Tags for device '${deviceId}':`, device.tags);
+        }
       }
       return device;
     };
+    
 
 
 
@@ -237,50 +244,34 @@ function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
 
       this.setValue = async function (tagId, value) {
         try {
-            // Use the cached device object
-            const device = await _fetchDevice(deviceId);
-    
-            if (!device) {
-                logger.error(`Device with ID '${deviceId}' not found.`);
-                return false;
-            }
-    
-            const property = device.property ? JSON.parse(device.property) : {};
-    
-            if (!property.address) {
-                logger.error(`Device '${device.name}' is missing a valid address.`);
-                return false;
-            }
-    
-            // Find the tag in the cached device object
-            const tag = device.tags.find((t) => t.id === tagId);
-    
-            if (!tag) {
-                logger.error(`Tag with ID '${tagId}' not found for device '${device.name}'.`);
-                return false;
-            }
-    
-            // Parse the value based on the tag type
-            value = _parseValue(tag.type, value);
-    
-            // Calculate the raw value using deviceUtils
-            const calculatedValue = await deviceUtils.tagRawCalculator(value, tag, runtime);
-    
-            // Perform the POST request to update the tag value
-            try {
-                await axios.post(property.address, [{ id: tagId, value: calculatedValue }]);
-                lastTimestampRequest = new Date().getTime();
-                logger.info(`setValue '${tag.name}' to ${value}`, true, true);
-            } catch (err) {
-                logger.error(`Failed to setValue for tag '${tag.name}': ${err.message}`);
-            }
-    
-            return true;
-        } catch (error) {
-            logger.error(`Error in setValue: ${error.message || error}`);
+          // Fetch the device and its tags
+          const device = await _fetchDevice(deviceId);
+          if (!device) {
+            logger.error(`Device with ID '${deviceId}' not found.`);
             return false;
+          }
+      
+          const tag = device.tags.find((t) => t.id === tagId);
+          if (!tag) {
+           console.log(`Tag with ID '${tagId}' not found.`);
+            return false;
+          }
+      
+          value = _parseValue(tag.type, value);
+          tag.value = await deviceUtils.tagRawCalculator(value, tag, runtime);
+      
+          await axios.post(apiProperty.postTags, [{ id: tagId, value: tag.value }]);
+      
+          lastTimestampRequest = new Date().getTime();
+       console.log(`setValue '${tag.name}' to ${value}`, true, true);
+      
+          return true;
+        } catch (err) {
+          console.log(`Error setting value for tag '${tagId}': ${err.message}`);
+          return false;
         }
-    };
+      };
+      
 
 
       /**
@@ -428,62 +419,78 @@ function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
 const varsValueCache = new Map(); // Key: deviceId, Value: varsValue map for each device
 
 const _updateVarsValue = async (reqdata, deviceId, io) => {
-  // console.log(`_updateVarsValue called with deviceId: ${deviceId}`); // Log the deviceId
+  console.log(`_updateVarsValue called for deviceId: ${deviceId}`);
 
   const timestamp = new Date().getTime();
-
-  // Flatten and normalize the data
   const flatData = dataToFlat(reqdata, apiProperty);
-
-  // Get or initialize varsValue for this device
+// console.log('📢 flatData', flatData);
   if (!varsValueCache.has(deviceId)) {
-      varsValueCache.set(deviceId, {}); // Initialize empty cache for this device
+      varsValueCache.set(deviceId, {});
   }
   const varsValue = varsValueCache.get(deviceId);
 
-  const changed = {}; // To store only tags that have changed
-  const allTags = {}; // To store all tags (changed and unchanged)
+  const changed = {};
+  const allTags = {};
 
-  // Process each flattened key-value pair
+  // Fetch the device and its tags
+  const device = await _fetchDevice(deviceId);
+  if (!device || !device.tags) {
+      console.error(`❌ Device '${deviceId}' not found or has no tags.`);
+      return;
+  }
+
+  // Create a lookup map for tag addresses -> IDs
+  const tagIdMap = new Map(device.tags.map(tag => [tag.address, tag.id]));
+
   for (const [key, newValue] of Object.entries(flatData)) {
-      const oldValue = varsValue[key]?.value; // Get the previous value
-
-      // Add all tags to the `allTags` object
-      allTags[key] = {
-          value: String(newValue),
-          timestamp: varsValue[key]?.timestamp || timestamp, // Use existing timestamp if unchanged
-          changed: oldValue !== String(newValue), // Flag to indicate if value changed
+      // ✅ Get the type of value from `flatData`
+      const newType = typeof newValue;
+      const normalizedKey = normalizeKey(key);
+      const oldValue = varsValue[normalizedKey]?.value;
+      const tagId = tagIdMap.get(normalizedKey) || null;
+      allTags[normalizedKey] = {
+          tagId,  
+          value: (newValue),
+       
+          newType,
+          oldValue,
+          timestamp: varsValue[normalizedKey]?.timestamp || timestamp,
+          changed: oldValue !== (newValue),
       };
+      // console.log(`🆕 New Type for '${normalizedKey}': ${newType}, Value: ${newValue}`);
 
-      // Update only if the value has changed
-      if (oldValue !== String(newValue)) {
-          // Update the varsValue cache only for changed values
-          varsValue[key] = {
-              value: String(newValue),
-              timestamp,
-          };
+      if (tagId && oldValue !== (newValue)) {
+          varsValue[normalizedKey] = { value: (newValue), timestamp };
+          changed[normalizedKey] = { tagId, value: (newValue), timestamp };
 
-          // Add to the `changed` object
-          changed[key] = {
-              value: String(newValue),
-              timestamp,
-          };
-
-          // console.log(`Value changed for '${key}':`, {
-          //     oldValue,
-          //     newValue: String(newValue),
-          // });
+          // ✅ Update tag value in the database
+          await updateTagValue(tagId, (newValue));
       }
   }
 
-  // Emit all tags to the frontend (both changed and unchanged)
-  io.emit('variable-changes', {
-      deviceId,
-      changes: allTags, // Emit the full state with the `changed` flag
-  });
+  // console.log('📢 variable-changes', { deviceId, changes: allTags });
 
-  // Return only the changed tags
+  // Emit the updated tags (with tagId) via WebSocket
+  io.emit('variable-changes', { deviceId, changes: allTags  });
+
   return changed;
+};
+
+
+const updateTagValue = async (tagId, newValue) => {
+  try {
+      const updatedTag = await prisma.tag.update({
+          where: { id: tagId },
+          data: {
+              value: String (newValue),
+              updatedAt: new Date(),
+          },
+      });
+
+      console.log(`✅ Tag '${updatedTag.label}' (ID: ${tagId}) updated to value: ${newValue}`);
+  } catch (error) {
+      console.error(`❌ Error updating tag ID '${tagId}':`, error.message);
+  }
 };
 
 

@@ -93,6 +93,7 @@ model Item {
 model Tag {
   id         String   @id @default(uuid())
   name       String? 
+  address      String? 
   value      String?
   label      String?
   type       String
@@ -105,7 +106,7 @@ model Tag {
   bitmask    Int? 
   items      Item[]
   device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, name: "DeviceTags")
-  @@unique([deviceId, name]) // Ensure tags are unique within the scope of a device
+  @@unique([deviceId,address]) // Ensure tags are unique within the scope of a device
 
 }
 
