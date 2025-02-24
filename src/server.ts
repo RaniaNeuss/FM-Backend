@@ -103,14 +103,22 @@ const getexistingdevices = async () => {
 
 (async () => {
   try {
-    const devices = await getexistingdevices();
-    await deviceManager.initializeAndPollDevices(devices);
-    await alarmManager.start(); // Start alarm manager
+    // Run all tasks in parallel
+    const [devices] = await Promise.all([
+      getexistingdevices(), // Fetch devices concurrently
+    ]);
 
+    await Promise.all([
+      deviceManager.initializeAndPollDevices(devices), // Initialize and poll devices
+      alarmManager.start() // Start alarm manager
+    ]);
+
+    console.log("✅ All services started successfully.");
   } catch (error) {
-    console.error('Error during server startup:', error);
+    console.error("❌ Error during server startup:", error);
   }
 })();
+
 
 // Start the server
 server.listen(PORT, () => {

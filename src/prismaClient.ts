@@ -67,46 +67,42 @@ const prisma = new PrismaClient().$extends({
 
 
     
-  tag: {
-  async $allOperations({ operation, args, query }) {
-    console.log(`📡 Intercepted operation on Tag: ${operation}`);
-    console.log("🔎 Arguments:", args);
+    tag: {
+      async $allOperations({ operation, args, query }) {
+        console.log(`📡 Intercepted operation on Tag: ${operation}`);
+        console.log("🔎 Arguments:", args);
 
-    let prevTag: Tag | null = null;
+        try {
+          const result = await query(args); // Execute the DB operation
 
-    try {
-      if (operation === "update") {
-        const tagId = args.where?.id;
-        if (tagId) {
-          prevTag = await prisma.tag.findUnique({ where: { id: tagId } });
-        } else {
-          console.warn("⚠️ No `id` provided in `where` clause for update operation.");
-        }
-      }
+          if (operation === "create" || operation === "upsert") {
+            const createdTag = result as Tag;
+            console.log(`✅ New Tag Created: ${createdTag.id}`);
 
-      const result = await query(args);
+            if (createdTag.deviceId) {
+              console.log(`🔄 Notifying device update for tag '${createdTag.label}' in device '${createdTag.deviceId}'`);
 
-      if (operation === "update") {
-        const updatedTag = result as Tag;
-        if (prevTag) {
-          console.log(`🔄 Tag updated: ${updatedTag.id}`);
-          console.log(`📌 Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
-          if (prevTag.value !== updatedTag.value) {
-            console.log(`⚡ Tag value changed! Updating alarms for tag ${updatedTag.id}...`);
-            // Instead of processing all alarms, update only those related to this tag.
-            alarmManager.updateAlarmsByTag(updatedTag);
+              // Fetch latest device data and trigger handleDeviceUpdated
+              const updatedDevice = await prisma.device.findUnique({
+                where: { id: createdTag.deviceId },
+                include: { tags: true },
+              });
+
+              if (updatedDevice) {
+                deviceManager.handleDeviceUpdated(updatedDevice, updatedDevice);
+              } else {
+                console.error(`❌ Could not fetch updated device '${createdTag.deviceId}'`);
+              }
+            }
           }
-        } else {
-          console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
+
+          return result;
+        } catch (err) {
+          console.error("❌ Error in Prisma middleware:", err);
+          throw err;
         }
-      }
-      return result;
-    } catch (err) {
-      console.error("❌ Error in Prisma middleware:", err);
-      throw err;
-    }
-  },
-},
+      },
+    },
 
   
     alarm: {

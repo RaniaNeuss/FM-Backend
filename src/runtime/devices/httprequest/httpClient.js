@@ -5,7 +5,7 @@
 const axios = require('axios');
 const utils = require('../../utils');
 const deviceUtils = require('../device-utils');
-
+const prisma =require ('../../../prismaClient')
 
 function HTTPclient(_data, _logger, _events, _runtime,prisma,io) {
     var runtime = _runtime;
@@ -433,9 +433,14 @@ const _updateVarsValue = async (reqdata, deviceId, io) => {
   const allTags = {};
 
   // Fetch the device and its tags
-  const device = await _fetchDevice(deviceId);
-  if (!device || !device.tags) {
-      console.error(`❌ Device '${deviceId}' not found or has no tags.`);
+  // 🔄 Fetch device and its tags directly from Prisma
+  const device = await prisma.device.findUnique({
+    where: { id: deviceId },
+    include: { tags: true }, // Ensure tags are fetched
+  });
+
+  if (!device ) {
+      console.error(`❌ Device '${deviceId}' not found `);
       return;
   }
 
@@ -613,46 +618,6 @@ function dataToFlat(data, property) {
   return normalizedData;
 }
 
-    // function normalizeKey(key) {
-    //     return key
-    //         .replace(/:/g, '.')          // Convert colons `:` to dots `.`
-    //         .replace(/\[(\d+)\]/g, '.$1'); // Convert array brackets `[0]` to dot notation `.0`
-    // }
-    
-    // function dataToFlat(data, property) {
-    //     const parseTree = (nodes, parentKey = '') => {
-    //         let result = {};
-    
-    //         if (Array.isArray(nodes)) {
-    //             nodes.forEach((item, index) => {
-    //                 const newKey = parentKey ? `${parentKey}[${index}]` : `[${index}]`;
-    //                 Object.assign(result, parseTree(item, newKey));
-    //             });
-    //         } else if (nodes && typeof nodes === 'object') {
-    //             Object.keys(nodes).forEach((key) => {
-    //                 const newKey = parentKey ? `${parentKey}.${key}` : key;
-    //                 Object.assign(result, parseTree(nodes[key], newKey));
-    //             });
-    //         } else {
-    //             result[parentKey] = nodes;
-    //         }
-    
-    //         return result;
-    //     };
-    
-    //     // Flatten the data
-    //     const flattenedData = parseTree(data);
-    
-    //     // Normalize keys for comparison
-    //     const normalizedData = {};
-    //     for (const key in flattenedData) {
-    //         const normalizedKey = normalizeKey(key); // Normalize keys here
-    //         normalizedData[normalizedKey] = flattenedData[key];
-    //     }
-    
-    //     return normalizedData;
-    // }
-
 /**
  * Return the result of http request
  */
@@ -683,6 +648,7 @@ module.exports = {
     },
     getRequestResult: getRequestResult
     , dataToFlat: dataToFlat,
+    
 }
 
 
