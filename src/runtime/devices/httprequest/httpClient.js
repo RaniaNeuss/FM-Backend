@@ -492,7 +492,7 @@ const updateTagValue = async (tagId, newValue) => {
           },
       });
 
-      console.log(`✅ Tag '${updatedTag.label}' (ID: ${tagId}) updated to value: ${newValue}`);
+      // console.log(`✅ Tag '${updatedTag.label}' (ID: ${tagId}) updated to value: ${newValue}`);
   } catch (error) {
       console.error(`❌ Error updating tag ID '${tagId}':`, error.message);
   }

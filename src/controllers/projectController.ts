@@ -2,10 +2,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
+import nodemailer from 'nodemailer';
 
 import { authenticateUser } from "../lib/authMiddleware";
-
-
 
 
 
@@ -58,7 +57,6 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
         res.status(500).json({ error: 'unexpected_error', message: 'An error occurred while creating the project' });
     }
 };
-
 
 
 
@@ -119,8 +117,6 @@ export const getUsersByProjectId = async (req: Request, res: Response): Promise<
         });
     }
 };
-
-
 
 
 
@@ -371,15 +367,46 @@ export const assignUsersToProject = async (req: Request, res: Response): Promise
             return;
         }
 
-        // Connect new users to the project
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    connect: userIds.map((id) => ({ id })), // Add new users
-                },
+        // Fetch users who are already assigned to this project
+        const alreadyAssignedUsers = await prisma.user.findMany({
+            where: {
+                id: { in: userIds },
+                status: "assigned",
+                projects: { some: { id: projectId } } // Ensure they are assigned to this specific project
             },
+            select: { id: true, email: true, username: true }
         });
+
+        // If any users are already assigned, return their details
+        if (alreadyAssignedUsers.length > 0) {
+            res.status(400).json({
+                error: "conflict_error",
+                message: "The following users are already assigned to this project.",
+                alreadyAssignedUsers, // Returns list of users already assigned
+            });
+            return;
+        }
+
+        // Update users' status to "assigned" and connect them to the project
+        await prisma.$transaction([
+            prisma.user.updateMany({
+                where: {
+                    id: { in: userIds },
+                    status: "active" // Only update users who are "active"
+                },
+                data: {
+                    status: "assigned"
+                }
+            }),
+            prisma.project.update({
+                where: { id: projectId },
+                data: {
+                    users: {
+                        connect: userIds.map((id) => ({ id })), // Add new users
+                    },
+                },
+            })
+        ]);
 
         console.info(`Users added to project ${projectId} successfully.`);
         res.status(200).json({
@@ -395,74 +422,12 @@ export const assignUsersToProject = async (req: Request, res: Response): Promise
         });
     }
 };
-// Controller: Edit Assigned Users in a Project (Replace Existing Users)
 
-export const editAssignedUsers = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const userId = req.userId; // Logged-in user
-        const { projectId } = req.params;
-        const { userIds } = req.body; // New list of user IDs to assign
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
 
-        if (!projectId) {
-            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
-            return;
-        }
 
-        if (!Array.isArray(userIds)) {
-            res.status(400).json({ error: 'validation_error', message: 'User IDs must be an array.' });
-            return;
-        }
 
-        // Check if the logged-in user is the owner of the project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-        });
-
-        if (!project) {
-            res.status(404).json({ error: 'not_found', message: 'Project not found.' });
-            return;
-        }
-
-        if (project.userId !== userId) {
-            res.status(403).json({
-                error: 'forbidden',
-                message: 'You do not have permission to edit assigned users in this project.',
-            });
-            return;
-        }
-
-        // Update assigned users (replace existing users with the new list)
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    set: [], // Remove all existing users
-                    connect: userIds.map((id) => ({ id })), // Add new users
-                },
-            },
-        });
-
-        console.info(`Updated assigned users for project ${projectId}.`);
-        res.status(200).json({
-            message: 'Assigned users updated successfully.',
-            projectId,
-            updatedUsers: userIds,
-        });
-    } catch (err: any) {
-        console.error(`Failed to edit assigned users for project ${req.params.projectId}: ${err.message}`);
-        res.status(500).json({
-            error: 'unexpected_error',
-            message: 'An error occurred while editing assigned users.',
-        });
-    }
-};
-// Controller: Remove Assigned Users from a Project
-
+// Controller: Remove Assigned Users from a Project and Update Status
 export const removeAssignedUsers = async (req: Request, res: Response): Promise<void> => {
     try {
         const userId = req.userId; // Logged-in user
@@ -502,21 +467,49 @@ export const removeAssignedUsers = async (req: Request, res: Response): Promise<
             return;
         }
 
-        // Remove users from the project
-        await prisma.project.update({
-            where: { id: projectId },
-            data: {
-                users: {
-                    disconnect: userIds.map((id) => ({ id })), // Remove specific users
-                },
+        // Check users' current status before removing
+        const usersToUpdate = await prisma.user.findMany({
+            where: {
+                id: { in: userIds },
+                status: { in: ["assigned", "invited"] } // Only update if status is "assigned" or "invited"
             },
+            select: { id: true, email: true, status: true }
         });
 
-        console.info(`Removed users from project ${projectId}.`);
+        if (usersToUpdate.length === 0) {
+            res.status(400).json({
+                error: 'validation_error',
+                message: 'No users found with "assigned" or "invited" status.',
+            });
+            return;
+        }
+
+        // Perform both updates in a transaction
+        await prisma.$transaction([
+            prisma.user.updateMany({
+                where: { id: { in: usersToUpdate.map(user => user.id) } },
+                data: { status: "active" } // Change status back to "active"
+            }),
+            prisma.project.update({
+                where: { id: projectId },
+                data: {
+                    users: {
+                        disconnect: usersToUpdate.map(user => ({ id: user.id })), // Remove users from project
+                    },
+                },
+            }),
+        ]);
+
+        console.info(`Removed users from project ${projectId}. Status updated to "active".`);
         res.status(200).json({
-            message: 'Users removed successfully.',
+            message: 'Users removed successfully and status updated to "active".',
             projectId,
-            removedUsers: userIds,
+            removedUsers: usersToUpdate.map(user => ({
+                id: user.id,
+                email: user.email,
+                previousStatus: user.status, // Show what status they had before
+                newStatus: "active"
+            })),
         });
     } catch (err: any) {
         console.error(`Failed to remove users from project ${req.params.projectId}: ${err.message}`);
@@ -529,12 +522,229 @@ export const removeAssignedUsers = async (req: Request, res: Response): Promise<
 
 
 
-function handleError(res: Response, err: any, context: string): void {
-    if (err && err.code) {
-         console.error(`${context}: ${err.message}`);
-        res.status(400).json({ error: err.code, message: err.message });
-    } else {
-         console.error(`${context}: ${err}`);
-        res.status(400).json({ error: 'unexpected_error', message: err });
+
+// Fetch unassigned users (Only Operators, Excluding Super Admins)
+export const getUnassignedUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { projectId } = req.params;
+
+        if (!projectId) {
+            res.status(400).json({ error: 'validation_error', message: 'Project ID is required.' });
+            return;
+        }
+
+        const unassignedUsers = await prisma.user.findMany({
+            where: {status: { not: "assigned" }, // Exclude users with status "assigned"
+
+                groups: {
+                    some: { name: 'Operator' } // Only users in "Operator" group
+                },
+                projects: {
+                    none: { id: projectId } // Exclude users assigned to the given project
+                },
+              
+            },
+            select: { id: true, email: true, username: true ,status : true , groups: { 
+                select: { name: true } // Select only the group names
+            }}
+        });
+
+        res.status(200).json(unassignedUsers);
+    } catch (err: any) {
+        console.error('Failed to fetch unassigned users:', err.message);
+        res.status(500).json({ error: 'unexpected_error', message: 'An error occurred while fetching unassigned users.' });
     }
-}
+};
+
+
+
+export const inviteUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'unauthorized', message: 'Admin is not logged in' });
+            return;
+        }
+
+        const { projectId } = req.params;
+        const { emails } = req.body;
+
+        if (!projectId) {
+            res.status(400).json({ error: "validation_error", message: "Project ID is required." });
+            return;
+        }
+
+        if (!Array.isArray(emails) || emails.length === 0) {
+            res.status(400).json({ error: "validation_error", message: "Emails must be provided as a non-empty array" });
+            return;
+        }
+
+        const project = await prisma.project.findUnique({ where: { id: projectId } });
+
+        if (!project) {
+            res.status(404).json({ error: "not_found", message: `Project with ID ${projectId} not found.` });
+            return;
+        }
+
+        for (const email of emails) {
+            // Check if the user already exists
+            const existingUser = await prisma.user.findUnique({ where: { email } });
+
+            if (existingUser) {
+                if (existingUser.status === "active" || existingUser.status === "assigned") {
+                    res.status(409).json({
+                        error: "conflict_error",
+                        message: `The email ${email} is already registered and cannot be invited.`,
+                    });
+                    return; // Stop execution
+                }
+                if (existingUser.status === "invited") {
+                    res.status(409).json({
+                        error: "conflict_error",
+                        message: `The email ${email} has already been invited.`,
+                    });
+                    return; // Stop execution
+                }
+            }
+        }
+
+        const invitedUsers = [];
+
+        for (const email of emails) {
+            // Create an "invited" user
+            const newUser = await prisma.user.create({
+                data: {
+                    email,
+                    username: email.split('@')[0], // Default username from email
+                    password: "", // No password set until registration
+                    info: "Invited user",
+                    status: "invited", // Track invited status
+                    groups: {
+                        connect: [{ name: "Operator" }], // Assign to Operator group
+                    },
+                    projects: { connect: [{ id: projectId }] }, // Assign to the project
+                },
+            });
+
+            invitedUsers.push(newUser);
+
+            // Send an email invitation
+            await sendInvitationEmail(email, projectId);
+        }
+
+        res.status(201).json({
+            message: "Users invited successfully.",
+            projectId,
+            invitedUsers
+        });
+
+    } catch (err: any) {
+        console.error("Failed to invite users:", err.message);
+        res.status(500).json({ error: "unexpected_error", message: "An error occurred while inviting users." });
+    }
+};
+
+
+
+
+
+// export const inviteUsers = async (req: Request, res: Response): Promise<void> => {
+//     try {
+//         const userId = req.userId;
+//         if (!userId) {
+//             res.status(401).json({ error: 'unauthorized', message: 'Admin is not logged in' });
+//             return;
+//         }
+//         const { projectId } = req.params;
+//         const { emails } = req.body;
+//         if (!projectId) {
+//             res.status(400).json({ error: "validation_error", message: "Project ID is required." });
+//             return;
+//         }
+//         if (!Array.isArray(emails) || emails.length === 0) {
+//             res.status(400).json({ error: "validation_error", message: "Emails must be provided as a non-empty array" });
+//             return;
+//         }
+//         const project = await prisma.project.findUnique({ where: { id: projectId } });
+
+//         if (!project) {
+//             res.status(404).json({ error: "not_found", message: `Project with ID ${projectId} not found.` });
+//             return;
+//         }
+//         const invitedUsers = [];
+
+//         for (const email of emails) {
+//             // Check if the user already exists
+//             const existingUser = await prisma.user.findUnique({ where: { email } });
+
+//             if (existingUser) {
+//                 console.warn(`User with email "${email}" already exists.`);
+//                 continue; // Skip existing users
+//             }
+
+//             // Create an "invited" user
+//            const newUser = await prisma.user.create({
+//             data: {
+//                 email,
+//                 username: email.split('@')[0], // Default username from email
+//                 password: "", // No password set until registration
+//                 info: "Invited user",
+//                 status: "invited", // Track invited status
+//                 groups: {
+//                     connect: [{ name: "Operator" }], // Assign to Operator group
+//                 },
+//                 projects: { connect: [{ id: projectId }] }, // Assign to the project
+//             },
+//         });
+
+//             invitedUsers.push(newUser);
+
+//             // Send an email invitation
+//             await sendInvitationEmail(email,projectId);
+//         }
+
+//         res.status(200).json({
+//             message: "Users invited successfully to the project.",
+//             projectId,
+//             invitedUsers,
+//         });
+//     } catch (err: any) {
+//         console.error("Failed to invite users:", err.message);
+//         res.status(500).json({ error: "unexpected_error", message: "An error occurred while inviting users." });
+//     }
+// };
+
+
+
+
+
+
+// Function to send an invitation email
+const sendInvitationEmail = async (email: string,projectId: string) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: "Gmail",
+            auth: {
+                user: process.env.EMAIL_USER, // Your email
+                pass: process.env.EMAIL_PASS, // Your email password
+            },
+        });
+
+        const registrationLink = `http://your-app.com/register?email=${encodeURIComponent(email)}&projectId=${projectId}`;
+
+        await transporter.sendMail({
+            from: '" Neuss Admin" <admin@your-app.com>',
+            to: email,
+            subject: "Neuss Project Invitation!",
+            text: `Hello,\n\nYou have been invited to join our system. Click the link below to register:\n${registrationLink}\n\nBest regards,\n Neuss Team`,
+            html: `<p>Hello,</p><p>You have been invited to join our system. Click the link below to register:</p><a href="${registrationLink}">Register Here</a><p>Best regards,<br> Neuss Team</p>`,
+        });
+
+        console.info(`Invitation email sent to ${email}`);
+    } catch (error) {
+        console.error(`Failed to send invitation email to ${email}:`, error);
+    }
+};
+
+
+

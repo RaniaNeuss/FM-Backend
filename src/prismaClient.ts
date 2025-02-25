@@ -1,6 +1,10 @@
 
 
-import { PrismaClient,Device,Tag ,Alarm} from '@prisma/client';
+import { PrismaClient, Device, Tag as PrismaTag, Alarm } from '@prisma/client';
+
+interface Tag extends PrismaTag {
+  alarms: Alarm[];
+}
 import deviceManager from './runtime/devices/deviceManager';
 
 import  alarmManager from './runtime/alarms/alarmmanager';
@@ -67,47 +71,56 @@ const prisma = new PrismaClient().$extends({
 
 
     
-    tag: {
-      async $allOperations({ operation, args, query }) {
-        console.log(`📡 Intercepted operation on Tag: ${operation}`);
-        console.log("🔎 Arguments:", args);
+  tag: {
+  async $allOperations({ operation, args, query }) {
+    console.log(`📡 Intercepted operation on Tag: ${operation}`);
+    
 
-        try {
-          const result = await query(args); // Execute the DB operation
+    let prevTag: Tag | null = null;
 
-          if (operation === "create" || operation === "upsert") {
-            const createdTag = result as Tag;
-            console.log(`✅ New Tag Created: ${createdTag.id}`);
-
-            if (createdTag.deviceId) {
-              console.log(`🔄 Notifying device update for tag '${createdTag.label}' in device '${createdTag.deviceId}'`);
-
-              // Fetch latest device data and trigger handleDeviceUpdated
-              const updatedDevice = await prisma.device.findUnique({
-                where: { id: createdTag.deviceId },
-                include: { tags: true },
-              });
-
-              if (updatedDevice) {
-                deviceManager.handleDeviceUpdated(updatedDevice, updatedDevice);
-              } else {
-                console.error(`❌ Could not fetch updated device '${createdTag.deviceId}'`);
-              }
-            }
-          }
-
-          return result;
-        } catch (err) {
-          console.error("❌ Error in Prisma middleware:", err);
-          throw err;
+    try {
+      if (operation === "update") {
+        const tagId = args.where?.id;
+        if (tagId) {
+          prevTag = await prisma.tag.findUnique({
+            where: { id: tagId },
+            include: { alarms: true }, // ✅ Fetch alarms associated with the tag
+          });
+        } else {
+          console.warn("⚠️ No `id` provided in `where` clause for update operation.");
         }
-      },
-    },
+      }
+
+      const result = await query(args);
+
+      if (operation === "update") {
+        const updatedTag = result as Tag;
+
+
+        if (prevTag) {
+          console.log(`📌 Tag '${updatedTag.label}' Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
+
+
+          if (prevTag.alarms.length > 0 && prevTag.value !== updatedTag.value) {
+    
+            alarmManager.updateAlarmsByTag(updatedTag);
+          }
+        } else {
+          console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
+        }
+      }
+      return result;
+    } catch (err) {
+      console.error("❌ Error in Prisma middleware:", err);
+      throw err;
+    }
+  },
+},
 
   
     alarm: {
       async $allOperations({ operation, args, query }) {
-        console.log("Arguments:", args);
+        console.log(`Intercepted operation on alarm : ${operation}`);
     
         let prevAlarm: Alarm | null = null;
     
@@ -158,3 +171,5 @@ const prisma = new PrismaClient().$extends({
 });
 
 export default prisma;
+
+

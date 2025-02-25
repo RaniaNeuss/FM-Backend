@@ -150,21 +150,6 @@ const handleDeviceUpdated = async (updatedDevice: any, prevDevice: any) => {
   }
 
 
-if (updatedDevice.tags.length !== prevDevice.tags.length) {
-  console.log(`🆕 New tag detected for '${updatedDevice.name}'. Restarting polling...`);
-  stopPolling(updatedDevice.id);
-  if (updatedDevice.enabled) {
-    const httpClient = HTTPClient.create(
-      { name: updatedDevice.name, property, id: updatedDevice.id },
-      console,
-      new EventEmitter(),
-      {},
-      prisma,
-      io
-    );
-    startPolling(updatedDevice, httpClient);
-  }
-}
 
 };
 /**

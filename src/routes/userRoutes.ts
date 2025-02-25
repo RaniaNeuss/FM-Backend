@@ -28,6 +28,7 @@ interface User {
     info: string | null;
     createdAt: Date;
     updatedAt: Date; 
+    status: string; 
   }
 const router = Router();
 // Role routes

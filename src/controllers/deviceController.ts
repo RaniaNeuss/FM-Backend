@@ -9,47 +9,6 @@ import axios from 'axios'; // Ensure this is at the top
 
 
 
-// export const saveTagToDevice = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     // Extract deviceId from the URL params and tag details from the request body
-//     const { id: deviceId } = req.params;
-//     const {  label, value, type,address } = req.body;
-
-//     // Validate required fields
-//     if (!deviceId ||  !type) {
-//       res.status(400).json({ error: 'Missing required fields: deviceId, name, or type' });
-//       return;
-//     }
-
-//     // Save or update the tag in the database
-//     const updatedTag = await prisma.tag.upsert({
-//       where: {
-//         deviceId_address: { deviceId, address }, // Composite key for unique identification
-//       },
-//       create: {
-//         deviceId,
-//         address,
-//         label,
-//         value,
-//         type,
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-//       },
-//       update: {
-//         label,
-//         value,
-//         type,
-//         updatedAt: new Date(),
-//       },
-//     });
-
-//     // Respond with the updated tag
-//     res.status(200).json({ message: 'Tag saved successfully', tag: updatedTag });
-//   } catch (error) {
-//     console.error('Error saving tag to device:', error);
-//     res.status(500).json({ error: 'Failed to save tag to device' });
-//   }
-// };
 
 export const createDevice = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -109,7 +68,7 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
         return;
       } catch (error) {
         console.error("Error fetching data from API:",);
-        res.status(500).json({ error: "Failed to fetch data from the API address" });
+        res.status(500).json({ error: " Failed to establish connection. Please check the API address" });
         return;
       }
     }
@@ -141,7 +100,40 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
 
 
 
+export const testWebAPIConnection = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Incoming request for WebAPI connection test:", req.body);
 
+    const { property } = req.body;
+
+    if (!property || !property.address) {
+      console.error("API address is missing in property.");
+      res.status(400).json({ error: "API address is required for WebAPI devices" });
+      return;
+    }
+
+    const { address, method = "GET" , format = "JSON"  } = property;
+
+    try {
+      // Try fetching data from the given API address
+      const response = await axios({ url: address, method });
+
+      if (response.status >= 200 && response.status < 300) {
+        console.log("✅ Connection successful!");
+        res.status(200).json({ message: "Connected!" });
+      } else {
+        console.error("⚠ API responded with an error:", response.status);
+        res.status(500).json({ error: "API responded with an error" });
+      }
+    } catch (error) {
+      console.error("❌ Failed to establish connection:");
+      res.status(500).json({ error: "Failed to establish connection. Please check the API address." });
+    }
+  } catch (error) {
+    console.error("❌ Error testing WebAPI connection:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 
 
@@ -191,6 +183,66 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
     }
   };
 
+  export const deleteManyDevices = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { deviceIds } = req.body; // Expect an array of device IDs
+
+        if (!Array.isArray(deviceIds) || deviceIds.length === 0) {
+            res.status(400).json({ error: "validation_error", message: "Device IDs must be provided as a non-empty array." });
+            return;
+        }
+
+        // Find devices to ensure they exist before deletion
+        const existingDevices = await prisma.device.findMany({
+            where: { id: { in: deviceIds } },
+            select: { id: true, name: true } // Fetch existing device IDs and names
+        });
+
+        if (existingDevices.length === 0) {
+            res.status(404).json({ error: "not_found", message: "No devices found with the provided IDs." });
+            return;
+        }
+
+        // Extract found IDs to delete
+        const existingDeviceIds = existingDevices.map(device => device.id);
+
+        // Delete the devices
+        await prisma.device.deleteMany({
+            where: { id: { in: existingDeviceIds } },
+        });
+
+        res.status(200).json({
+            message: "Devices deleted successfully.",
+            deletedDevices: existingDevices
+        });
+
+    } catch (error) {
+        console.error("Error deleting devices:", error);
+        res.status(500).json({ error: "unexpected_error", message: "An error occurred while deleting devices." });
+    }
+};
+
+
+export const deleteAllDevices = async (req: Request, res: Response): Promise<void> => {
+  try {
+      // Delete all devices from the database
+      const deletedDevices = await prisma.device.deleteMany({});
+
+      if (deletedDevices.count === 0) {
+          res.status(404).json({ error: "not_found", message: "No devices found to delete." });
+          return;
+      }
+
+      res.status(200).json({
+          message: "All devices have been deleted successfully.",
+          deletedCount: deletedDevices.count
+      });
+
+  } catch (error) {
+      console.error("Error deleting all devices:", error);
+      res.status(500).json({ error: "unexpected_error", message: "An error occurred while deleting all devices." });
+  }
+};
 
   
   export const deleteDevice = async (req: Request, res: Response): Promise<void> => {
@@ -262,50 +314,7 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
 
 
   
-// Update an existing tag value in the database
-// export const updateTagValue = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { deviceId, tagName } = req.params;
-//     const { value } = req.body;
 
-//     if (!deviceId || !tagName) {
-//       res.status(400).json({ error: "Device ID and tag name are required." });
-//       return;
-//     }
-
-//     // Find the tag
-//     const tag = await prisma.tag.findFirst({
-//       where: {
-//         deviceId,
-//         name: tagName,
-//       },
-//     });
-
-//     if (!tag) {
-//       res.status(404).json({ error: "Tag not found." });
-//       return;
-//     }
-
-//     // Update the tag value
-//     const updatedTag = await prisma.tag.update({
-//       where: {
-//         id: tag.id,
-//       },
-//       data: {
-//         value, 
-//         updatedAt: new Date(),
-//       },
-//     });
-
-//     res.status(200).json({
-//       message: "Tag updated successfully.",
-//       tag: updatedTag,
-//     });
-//   } catch (error) {
-//     console.error("Error updating tag value:", error);
-//     res.status(500).json({ error: "Failed to update tag value." });
-//   }
-// };
 
   export const setTankLevel = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -421,49 +430,45 @@ export const createDevice = async (req: Request, res: Response): Promise<void> =
   
 
 
- // export const editDeviceAPI = async (req: Request, res: Response): Promise<void> => {
-  //   try {
-  //     const { id } = req.params; // Device ID from URL
-  //     const { name, description, property, enabled, polling } = req.body; // Update fields
   
-  //     const parsedProperty = JSON.stringify(property);
-    
-  //     // Fetch the previous device details using `id`
-  //     const prevDevice = await prisma.device.findUnique({ where: { id } });
-  //     if (!prevDevice) {
-  //       res.status(404).json({ error: 'Device not found' });
-  //       return;
-  //     }
-  
-  //     // Check for duplicate name only if a new `name` is provided
-  //     if (name && name !== prevDevice.name) {
-  //       const existingDevice = await prisma.device.findUnique({ where: { name } });
-  //       if (existingDevice) {
-  //         console.error('Device with the same name already exists.');
-  //         res.status(400).json({ error: 'Device with the same name already exists' });
-  //         return;
-  //       }
-  //     }
-  
-  //     // Update the device in the database
-  //     const updatedDevice = await prisma.device.update({
-  //       where: { id },
-  //       data: {
-  //         name,
-  //         description,
-  //         property: parsedProperty,
-  //         enabled,
-  //         polling,
-  //       },
-  //     });
-  
-  //     console.log(`Device '${id}' updated in the database.`);
-  
-  //     // Handle changes in polling or enabled state
-  
-  //     res.status(200).json(updatedDevice);
-  //   } catch (error) {
-  //     console.error('Error editing device:', error);
-  //     res.status(500).json({ error: 'Failed to edit device' });
-  //   }
-  // };
+// export const saveTagToDevice = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     // Extract deviceId from the URL params and tag details from the request body
+//     const { id: deviceId } = req.params;
+//     const {  label, value, type,address } = req.body;
+
+//     // Validate required fields
+//     if (!deviceId ||  !type) {
+//       res.status(400).json({ error: 'Missing required fields: deviceId, name, or type' });
+//       return;
+//     }
+
+//     // Save or update the tag in the database
+//     const updatedTag = await prisma.tag.upsert({
+//       where: {
+//         deviceId_address: { deviceId, address }, // Composite key for unique identification
+//       },
+//       create: {
+//         deviceId,
+//         address,
+//         label,
+//         value,
+//         type,
+//         createdAt: new Date(),
+//         updatedAt: new Date(),
+//       },
+//       update: {
+//         label,
+//         value,
+//         type,
+//         updatedAt: new Date(),
+//       },
+//     });
+
+//     // Respond with the updated tag
+//     res.status(200).json({ message: 'Tag saved successfully', tag: updatedTag });
+//   } catch (error) {
+//     console.error('Error saving tag to device:', error);
+//     res.status(500).json({ error: 'Failed to save tag to device' });
+//   }
+// };

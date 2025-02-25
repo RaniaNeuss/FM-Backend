@@ -38,6 +38,7 @@ model User {
   name      String?
   email     String         @unique
   info      String?
+  status    String          @default("active")  // "invited", "active", "assigned"
   password  String
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
