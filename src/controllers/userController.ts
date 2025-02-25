@@ -519,120 +519,82 @@ export const editProfile = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+
 export const editUser = async (req: Request, res: Response): Promise<void> => {
     try {
-   
+        const userId = req.userId; // The logged-in user making the request
+        const { id } = req.params; // The ID of the user being edited
+        const { email, name, info, username, password, group } = req.body;
 
-    
+        // 1️⃣ **Check if user is authenticated**
+        if (!userId) {
+            res.status(401).json({ error: "unauthorized", message: "User is not logged in" });
+            return;
+        }
 
-       // Retrieve userId from session
-        const userId = req.userId;   
-        const id =req.params.id;
+        // 2️⃣ **Ensure user ID is provided**
+        if (!id) {
+            res.status(400).json({ error: "validation_error", message: "User ID is required." });
+            return;
+        }
 
+        // 3️⃣ **Check if the user to edit exists**
+        const user = await prisma.user.findUnique({ where: { id } });
+        if (!user) {
+            res.status(404).json({ error: "not_found", message: `User with ID ${id} not found.` });
+            return;
+        }
 
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-
-       }        
-       
-       if (!id) {
-        res.status(400).json({
-            error: "validation_error",
-            message: "User ID is required.",
+        // 4️⃣ **Check if the logged-in user is an admin OR editing their own account**
+        const isAdmin = await prisma.user.findFirst({
+            where: { id: userId, groups: { some: { name: "SuperAdmin" } } },
         });
-        return;
-    }
 
+        if (!isAdmin && userId !== id) {
+            res.status(403).json({ error: "forbidden", message: "You do not have permission to edit this user." });
+            return;
+        }
 
-    // Check if the user exists
-    const user = await prisma.user.findUnique({
-        where: {  id: String(id) },
-    });
+        // 5️⃣ **Validate and check if the group exists (only if provided)**
+        let groupUpdate = {};
+        if (group) {
+            const existingGroup = await prisma.group.findUnique({ where: { name: group } });
+            if (!existingGroup) {
+                res.status(404).json({ error: "not_found", message: `Group "${group}" does not exist.` });
+                return;
+            }
+            groupUpdate = { groups: { set: [{ id: existingGroup.id }] } }; // Set new group
+        }
 
-    if (!user) {
-        res.status(404).json({
-            error: "not_found",
-            message: `User with ID ${id} not found.`,
-        });
-        return;
-    }
+        // 6️⃣ **Hash password only if updating password**
+        let hashedPassword = undefined;
+        if (password) {
+            if (password.length < 6) {
+                res.status(400).json({ error: "validation_error", message: "Password must be at least 6 characters long" });
+                return;
+            }
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
 
-
-       const {email, name, info,username,password ,group} = req.body; 
-    
-    
-        
-       const existingGroup = await prisma.group.findUnique({ where: { name: group } });
-       if (!existingGroup) {
-            console.warn(`User creation failed: group "${group}" does not exist`);
-           res.status(404).json({ error: "not_found", message: `Group "${group}" does not exist` });
-           return;
-       }
-
-        // if ( typeof username !== "string") {
-        //     console.warn("Validation failed: username is missing or invalid");
-        //     res.status(400).json({ error: "validation_error", message: "Valid username is required" });
-        //     return;
-        // }
-
-    
-        // if ( typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        //      console.warn("Validation failed: email is missing or invalid");
-        //     res.status(400).json({ error: "validation_error", message: "Valid email is required" });
-        //     return;
-        // }
-
-        // if (typeof password !== "string" || password.length < 6) {
-        //      console.warn("Validation failed: password is missing or too short");
-        //     res.status(400).json({ error: "validation_error", message: "Password must be at least 6 characters long" });
-        //     return;
-        // }
-
-        // if ( typeof group !== "string") {
-        //      console.warn("Validation failed: group is missing or invalid");
-        //     res.status(400).json({ error: "validation_error", message: "Valid group is required" });
-        //     return;
-        // }
-
-        // // Validate `info`
-        // if (info && typeof info !== "string") {
-        //     res.status(400).json({
-        //         error: "validation_error",
-        //         message: "Info must be a valid string.",
-        //     });
-        //     return;
-        // }
-
-
-        // Check if the group exists
-    
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        // Update the user in the database
+        // 7️⃣ **Update the user with provided fields**
         const updatedUser = await prisma.user.update({
-            where: {  id: String(userId) },
+            where: { id },
             data: {
-                email, name, info,username
-                ,  password: hashedPassword,
-                groups: {
-                    connect: [{ id: existingGroup.id }],
-                },
-
+                email: email || undefined, 
+                name: name || undefined,
+                info: info || undefined,
+                username: username || undefined,
+                password: hashedPassword || undefined, // Update only if password is provided
+                ...groupUpdate, // Apply group update if necessary
                 updatedAt: new Date(),
             },
         });
 
-        res.status(200).json({
-            message: "User updated successfully.",
-            user: updatedUser,
-        });
+        // 8️⃣ **Respond with success message**
+        res.status(200).json({ message: "User updated successfully.", user: updatedUser });
     } catch (err: any) {
         console.error(`Failed to edit user with ID ${req.params.id}: ${err.message}`);
-        res.status(500).json({
-            error: "unexpected_error",
-            message: "An error occurred while updating the user.",
-        });
+        res.status(500).json({ error: "unexpected_error", message: "An error occurred while updating the user." });
     }
 };
 

@@ -34,7 +34,7 @@ router.put('/:id',authenticateUser, updateProjectData); // POST /api/projects/da
 router.get('/:projectId/users',authenticateUser, getUsersByProjectId);
 
 router.post('/:projectId/assignusers',authenticateUser, assignUsersToProject);
-router.get('/:projectId/unassignedusers',  getUnassignedUsers);
+router.get('/:projectId/unassignedusers', authenticateUser, getUnassignedUsers);
 router.post('/:projectId/inviteusers', authenticateUser, inviteUsers);
 
 // Delete a project by ID
