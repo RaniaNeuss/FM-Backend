@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { getUsers,refreshtoken,editUser, Register,createUser, deleteUser, getGroups, createGroup, deleteGroup, getUser, login , authStatus ,logout,editProfile } from '../controllers/userController';
 import passport from "passport";
 import jwt from "jsonwebtoken";
-import session from 'express-session';
 import { JWT_SECRET, REFRESH_SECRET } from "../lib/config";
+import { authorizeRoles } from '../lib/authorizeRoles';
 
 import { authenticateUser } from "../lib/authMiddleware";
 
@@ -32,16 +32,19 @@ interface User {
   }
 const router = Router();
 // Role routes
-router.get('/groups',authenticateUser, getGroups);
-router.post('/groups',authenticateUser, createGroup);
-router.delete('/groups/:id',authenticateUser, deleteGroup);
+router.get('/groups',authenticateUser,authorizeRoles(['SuperAdmin']), getGroups);
+router.post('/groups',authenticateUser,authorizeRoles(['SuperAdmin']), createGroup);
+router.delete('/groups/:id',authenticateUser,authorizeRoles(['SuperAdmin']), deleteGroup);
 
 // User routes
-router.get('/',authenticateUser, getUsers);
-router.post('/',authenticateUser, createUser);
+router.get('/',authenticateUser, authorizeRoles(['SuperAdmin']),getUsers);
 
+router.post('/',
+  authenticateUser,authorizeRoles(['SuperAdmin']), 
+  createUser
+);
 router.post('/register', Register);
-router.delete('/:id',authenticateUser, deleteUser);
+router.delete('/:id',authenticateUser,authorizeRoles(['SuperAdmin']), deleteUser);
 router.get('/:id',authenticateUser, getUser);
 router.put('/',authenticateUser, editProfile);
 router.put('/:id',authenticateUser, editUser);

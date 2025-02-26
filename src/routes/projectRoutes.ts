@@ -8,10 +8,9 @@ import {
   removeAssignedUsers,
   deleteProject,getUsersByProjectId,inviteUsers,getUnassignedUsers
  
-} 
-
-from '../controllers/projectController';
+} from '../controllers/projectController';
 import { authenticateUser } from "../lib/authMiddleware";
+import { authorizeRoles } from '../lib/authorizeRoles';
 
 const router = Router();
 
@@ -23,22 +22,22 @@ router.get('/:id',authenticateUser, getProjectById); // GET /api/projects/:id
 // Edit (Replace) Assigned Users in a Project
 
 // Remove Specific Users from a Project
-router.delete('/:projectId/removeusers', authenticateUser, removeAssignedUsers);
+router.delete('/:projectId/removeusers',authenticateUser,authorizeRoles(['SuperAdmin']), removeAssignedUsers);
 
 // Create a new project
-router.post('/create',authenticateUser, createProject); // POST /api/projects
+router.post('/create',authenticateUser,authorizeRoles(['SuperAdmin']), createProject); // POST /api/projects
 
 // Update specific project data
 router.put('/:id',authenticateUser, updateProjectData); // POST /api/projects/data
 
-router.get('/:projectId/users',authenticateUser, getUsersByProjectId);
+router.get('/:projectId/users',authenticateUser,authorizeRoles(['SuperAdmin']), getUsersByProjectId);
 
-router.post('/:projectId/assignusers',authenticateUser, assignUsersToProject);
-router.get('/:projectId/unassignedusers', authenticateUser, getUnassignedUsers);
-router.post('/:projectId/inviteusers', authenticateUser, inviteUsers);
+router.post('/:projectId/assignusers',authenticateUser,authorizeRoles(['SuperAdmin']), assignUsersToProject);
+router.get('/:projectId/unassignedusers',authenticateUser,authorizeRoles(['SuperAdmin']), getUnassignedUsers);
+router.post('/:projectId/inviteusers',authenticateUser,authorizeRoles(['SuperAdmin']), inviteUsers);
 
 // Delete a project by ID
-router.delete('/:id',authenticateUser, deleteProject); // DELETE /api/projects/:id
+router.delete('/:id',authenticateUser,authorizeRoles(['SuperAdmin']), deleteProject); // DELETE /api/projects/:id
 
 
 

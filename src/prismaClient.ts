@@ -113,7 +113,40 @@ const prisma = basePrisma.$extends({
         return result;
       },
     },
+  
+    alarmDefinition: {
+      async $allOperations({ operation, args, query }) {
+        console.log(`Intercepted operation on AlarmDefinition: ${operation}`);
 
+        // If "delete" => remove associated alarms from memory
+        if (operation === "delete") {
+          // The ID of the alarmDefinition being deleted
+          const alarmDefId = args.where?.id;
+          if (alarmDefId) {
+            // First, fetch child alarms
+            const childAlarms = await basePrisma.alarm.findMany({
+              where: { definitionId: alarmDefId },
+            });
+            // Remove from memory
+            childAlarms.forEach((al) => {
+              alarmManager.removeAlarmInMemory(al.id);
+            });
+          }
+        }
+
+        // Execute the actual DB operation
+        const result = await query(args);
+
+        // Optionally do more things after the delete
+        if (operation === "delete" && result) {
+          console.log(`AlarmDefinition deleted with ID: ${args.where?.id}`);
+        }
+
+        return result;
+      },
+    },
+    // ... other extended parts: device, tag, alarm
+ 
     alarm: {
       /**
        * Intercept all alarm operations

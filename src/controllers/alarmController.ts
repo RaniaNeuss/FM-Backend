@@ -20,7 +20,14 @@ const AlarmStatusEnum = {
 
 
 export const setAlarmDefinition = async (req: Request, res: Response): Promise<void> => {
-  try {
+  try { // Retrieve userId from session
+    const userId = req.userId;   
+    
+
+   if (!userId) {
+       res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+       return;
+   }
     const { projectId } = req.params;
     if (!projectId) {
     res.status(400).json({
@@ -181,7 +188,14 @@ if (!subproperty.ackmode) {
 
 
 export const editAlarmdef= async (req: Request, res: Response): Promise<void> => {
-  try {
+  try { // Retrieve userId from session
+    const userId = req.userId;   
+    
+
+   if (!userId) {
+       res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+       return;
+   }
     const { alarmDefId } = req.params;
     if (!alarmDefId) {
       res.status(400).json({
@@ -270,218 +284,107 @@ export const editAlarmdef= async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-export const editAlarm = async (req: Request, res: Response): Promise<void> => {
+// DELETE /alarmdefinitions/:alarmDefId
+export const deleteAlarmDefinition = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { alarmId } = req.params;
-    if (!alarmId) {
-      res.status(400).json({ error: "validation_error", message: "Alarm ID is required." });
+    // 1) Ensure user is logged in
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "unauthorized", message: "User is not logged in" });
       return;
     }
 
-    // Destructure possible fields from the request body for partial updates
-    const { name, type, tagId, isEnabled, status, subproperty } = req.body;
-    const dataToUpdate: any = {};
-
-    if (name !== undefined) {
-      dataToUpdate.name = name;
-    }
-    if (type !== undefined) {
-      dataToUpdate.type = type;
-    }
-    if (isEnabled !== undefined) {
-      dataToUpdate.isEnabled = isEnabled;
-    }
-    if (status !== undefined) {
-      dataToUpdate.status = status;
-    }
-    if (subproperty !== undefined) {
-      dataToUpdate.subproperty = JSON.stringify(subproperty);
-    }
-    // Only update the tag connection if tagId is provided
-    if (tagId !== undefined) {
-      dataToUpdate.tag = { connect: { id: tagId } };
-    }
-
-    // If no fields are provided, return an error.
-    if (Object.keys(dataToUpdate).length === 0) {
+    // 2) Get the alarmDefId from URL params
+    const { alarmDefId } = req.params;
+    if (!alarmDefId) {
       res.status(400).json({
         error: "validation_error",
-        message: "No valid fields provided for update.",
+        message: "AlarmDefinition ID is required.",
       });
       return;
     }
 
-    // Update the alarm record in the DB
-    const updatedAlarm = await prisma.alarm.update({
-      where: { id: alarmId },
-      data: dataToUpdate,
-            include: { tag: true },
-
+    // 3) Find all alarms referencing this definition, so we can remove them from memory
+    const alarms = await prisma.alarm.findMany({
+      where: { definitionId: alarmDefId },
+      include: { tag: true },
     });
 
-    console.log(`✅ Alarm ${updatedAlarm.id} updated successfully in DB.`);
-    // Notice: We do NOT call alarmManager.addOrUpdateAlarmInMemory(updatedAlarm) here.
-    // The Prisma middleware will automatically intercept this update and update the in-memory manager.
+    // 4) Remove them from in-memory manager
+    alarms.forEach((alarm) => {
+      alarmManager.removeAlarmInMemory(alarm.id);
+    });
+
+    // 5) Delete the alarms from the DB
+    await prisma.alarm.deleteMany({
+      where: { definitionId: alarmDefId },
+    });
+
+    // 6) Delete the AlarmDefinition itself
+    await prisma.alarmDefinition.delete({
+      where: { id: alarmDefId },
+    });
 
     res.status(200).json({
       success: true,
-      message: "Alarm updated successfully.",
-      alarm: updatedAlarm,
+      message: `AlarmDefinition ${alarmDefId} and associated Alarms are deleted.`,
     });
-  } catch (error: any) {
-    console.error("Error updating alarm:", error.message);
+  } catch (err: any) {
+    console.error("Error deleting AlarmDefinition:", err.message);
     res.status(500).json({
       error: "unexpected_error",
-      message: error.message,
+      message: err.message,
     });
   }
 };
-// export const setAlarm = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { projectId } = req.params;
-//     if (!projectId) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "Project ID is required in the URL parameters.",
-//       });
-//       return;
-//     }
-
-  
-//     const {name, type, tagId, isEnabled, status, subproperty, toremove } = req.body;
-
-//     if (!type || !tagId || !subproperty) {
-//       res
-//         .status(400)
-//         .json({
-//           error: "validation_error",
-//           message: "Type, tagId, and subproperty are required.",
-//         });
-//       return;
-//     }
-
-//     // Extract subproperty fields
-//     const { min, max, ackmode, timedelay, checkdelay, text, group } = subproperty;
-//     if (min == null || max == null) {
-//       res.status(400).json({
-//         error: "validation_error",
-//         message: "subproperty must include min and max.",
-//       });
-//       return;
-//     }
-
-//     // Default ackmode if not given
-//     if (!subproperty.ackmode) {
-//       subproperty.ackmode = "float";
-//     }
-
-//     // Check the tag
-//     const tag = await prisma.tag.findUnique({ where: { id: tagId } });
-//     if (!tag) {
-//       res.status(404).json({
-//         error: "not_found",
-//         message: `Tag with id ${tagId} not found.`,
-//       });
-//       return;
-//     }
-
-//     // Evaluate the current tag value
-//     const tagValue = parseFloat(tag.value || "0");
-//     let initialStatus = tagValue >= min && tagValue <= max ? "N" : "";
-//     // If alarm is ON, we set an ontime
-//     let ontime = initialStatus === "N" ? new Date() : null;
-
-//     // 1) Upsert the Alarm in the main Alarm table
-//     const newAlarm = await prisma.alarm.create({
-//       data: {
-//         name,
-//         type,
-//         tag: { connect: { id: tagId } },
-//         subproperty: JSON.stringify(subproperty),
-//         isEnabled: isEnabled ?? false,
-//         status: initialStatus,
-//         project: { connect: { id: projectId } },
-//         ontime,
-        
-//       },
-//       include: { tag: true },
-      
-      
 
 
-//     });
+export const getAllAlarmDefinitions = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // 1) Ensure user is logged in
+    const userId = req.userId;
+    if (!userId) {
+      res
+        .status(401)
+        .json({ error: "unauthorized", message: "User is not logged in" });
+      return;
+    }
+
+    // 2) Fetch all alarm definitions
+    //    Optionally include related fields (e.g. 'tag', 'project')
+    const alarmDefinitions = await prisma.alarmDefinition.findMany({
+      include: {
+        tag: true,       // if you want the Tag details
+        project: true,   // if you want the Project details
+      },
+    });
+
+    // 3) Return them
+    res.status(200).json(alarmDefinitions);
+  } catch (err: any) {
+    console.error("Error fetching alarm definitions:", err.message);
+    res.status(500).json({
+      error: "unexpected_error",
+      message: err.message,
+    });
+  }
+};
 
 
-//     // 2) Now, upsert into AlarmHistory using (alarmId, ontime) as the composite
-//     // If 'ontime' is null (because it's VOID), we can skip history OR 
-//     // you might store a placeholder. Up to your logic.
-//     if (ontime) {
-//       await prisma.alarmHistory.upsert({
-//         where: {
-//           // composite unique index on (alarmId, ontime)
-//           alarmId_ontime: {
-//             alarmId: newAlarm.id,
-//             ontime,
-//           },
-//         },
-//         create: {
-//           alarmId: newAlarm.id,
-//           name: name,
-//           type,
-//           status: initialStatus,
-//           text: text || "",
-//           group: group || "",
-//           ontime, // new ON cycle
-//         },
-//         update: {
-//           // If it already exists, update status
-//           status: initialStatus,
-//           // Note: If you want to mark OFF or ACK, do it in future updates 
-//           updatedAt: new Date(),
-//         },
-//       });
-//     }
 
-//     // 3) If "toremove" is set, remove the alarm from the DB (main alarm table).
-//     if (toremove) {
-//       await prisma.alarm.delete({ where: { id: newAlarm.id } });
-//       console.log(`❌ Alarm ${newAlarm.id} deleted.`);
-//     }
-
-//     res
-//       .status(200)
-//       .json({
-//         success: true,
-//         message: "Alarm processed successfully.",
-//         alarm: newAlarm,
-//       });
-//   } catch (err) {
-//     console.error(`❌ Error setting alarm: `, err);
-//     res.status(500).json({
-//       error: "unexpected_error",
-//       message: err instanceof Error ? err.message : `${err}`,
-//     });
-//   }
-// };
 export const setAlarmAck = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { alarmId } = req.params;    // e.g. /alarms/:alarmId/ack
-    const userId = req.userId;         // from auth middleware
+    const { alarmId } = req.params;    
+ const userId = req.userId;   
+         
 
+ if (!userId) {
+     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+     return;
+ }
     // 1) Validate presence
     if (!alarmId) {
       res.status(400).json({
@@ -491,13 +394,7 @@ export const setAlarmAck = async (req: Request, res: Response): Promise<void> =>
       return; // <-- End the function
     }
 
-    if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: "User not found in request context (userId).",
-      });
-      return; // <-- End the function
-    }
+  
 
     // 2) Fetch user details (optional if you want to confirm user exists)
     const user = await prisma.user.findUnique({
@@ -548,10 +445,6 @@ export const setAlarmAck = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
-
-
-
-
 
 
 
@@ -689,28 +582,6 @@ export const deleteAllAlarmHistories = async (req: Request, res: Response): Prom
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //fetch all alarms
 
 export const getAllAlarms = async (req: Request, res: Response): Promise<void> => {
@@ -728,3 +599,206 @@ export const getAllAlarms = async (req: Request, res: Response): Promise<void> =
         });
     }
 };
+
+
+
+
+
+
+
+
+
+
+export const editAlarm = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { alarmId } = req.params;
+    if (!alarmId) {
+      res.status(400).json({ error: "validation_error", message: "Alarm ID is required." });
+      return;
+    }
+
+    // Destructure possible fields from the request body for partial updates
+    const { name, type, tagId, isEnabled, status, subproperty } = req.body;
+    const dataToUpdate: any = {};
+
+    if (name !== undefined) {
+      dataToUpdate.name = name;
+    }
+    if (type !== undefined) {
+      dataToUpdate.type = type;
+    }
+    if (isEnabled !== undefined) {
+      dataToUpdate.isEnabled = isEnabled;
+    }
+    if (status !== undefined) {
+      dataToUpdate.status = status;
+    }
+    if (subproperty !== undefined) {
+      dataToUpdate.subproperty = JSON.stringify(subproperty);
+    }
+    // Only update the tag connection if tagId is provided
+    if (tagId !== undefined) {
+      dataToUpdate.tag = { connect: { id: tagId } };
+    }
+
+    // If no fields are provided, return an error.
+    if (Object.keys(dataToUpdate).length === 0) {
+      res.status(400).json({
+        error: "validation_error",
+        message: "No valid fields provided for update.",
+      });
+      return;
+    }
+
+    // Update the alarm record in the DB
+    const updatedAlarm = await prisma.alarm.update({
+      where: { id: alarmId },
+      data: dataToUpdate,
+            include: { tag: true },
+
+    });
+
+    console.log(`✅ Alarm ${updatedAlarm.id} updated successfully in DB.`);
+    // Notice: We do NOT call alarmManager.addOrUpdateAlarmInMemory(updatedAlarm) here.
+    // The Prisma middleware will automatically intercept this update and update the in-memory manager.
+
+    res.status(200).json({
+      success: true,
+      message: "Alarm updated successfully.",
+      alarm: updatedAlarm,
+    });
+  } catch (error: any) {
+    console.error("Error updating alarm:", error.message);
+    res.status(500).json({
+      error: "unexpected_error",
+      message: error.message,
+    });
+  }
+};
+// export const setAlarm = async (req: Request, res: Response): Promise<void> => {
+  //   try {
+  //     const { projectId } = req.params;
+  //     if (!projectId) {
+  //       res.status(400).json({
+  //         error: "validation_error",
+  //         message: "Project ID is required in the URL parameters.",
+  //       });
+  //       return;
+  //     }
+  
+    
+  //     const {name, type, tagId, isEnabled, status, subproperty, toremove } = req.body;
+  
+  //     if (!type || !tagId || !subproperty) {
+  //       res
+  //         .status(400)
+  //         .json({
+  //           error: "validation_error",
+  //           message: "Type, tagId, and subproperty are required.",
+  //         });
+  //       return;
+  //     }
+  
+  //     // Extract subproperty fields
+  //     const { min, max, ackmode, timedelay, checkdelay, text, group } = subproperty;
+  //     if (min == null || max == null) {
+  //       res.status(400).json({
+  //         error: "validation_error",
+  //         message: "subproperty must include min and max.",
+  //       });
+  //       return;
+  //     }
+  
+  //     // Default ackmode if not given
+  //     if (!subproperty.ackmode) {
+  //       subproperty.ackmode = "float";
+  //     }
+  
+  //     // Check the tag
+  //     const tag = await prisma.tag.findUnique({ where: { id: tagId } });
+  //     if (!tag) {
+  //       res.status(404).json({
+  //         error: "not_found",
+  //         message: `Tag with id ${tagId} not found.`,
+  //       });
+  //       return;
+  //     }
+  
+  //     // Evaluate the current tag value
+  //     const tagValue = parseFloat(tag.value || "0");
+  //     let initialStatus = tagValue >= min && tagValue <= max ? "N" : "";
+  //     // If alarm is ON, we set an ontime
+  //     let ontime = initialStatus === "N" ? new Date() : null;
+  
+  //     // 1) Upsert the Alarm in the main Alarm table
+  //     const newAlarm = await prisma.alarm.create({
+  //       data: {
+  //         name,
+  //         type,
+  //         tag: { connect: { id: tagId } },
+  //         subproperty: JSON.stringify(subproperty),
+  //         isEnabled: isEnabled ?? false,
+  //         status: initialStatus,
+  //         project: { connect: { id: projectId } },
+  //         ontime,
+          
+  //       },
+  //       include: { tag: true },
+        
+        
+  
+  
+  //     });
+  
+  
+  //     // 2) Now, upsert into AlarmHistory using (alarmId, ontime) as the composite
+  //     // If 'ontime' is null (because it's VOID), we can skip history OR 
+  //     // you might store a placeholder. Up to your logic.
+  //     if (ontime) {
+  //       await prisma.alarmHistory.upsert({
+  //         where: {
+  //           // composite unique index on (alarmId, ontime)
+  //           alarmId_ontime: {
+  //             alarmId: newAlarm.id,
+  //             ontime,
+  //           },
+  //         },
+  //         create: {
+  //           alarmId: newAlarm.id,
+  //           name: name,
+  //           type,
+  //           status: initialStatus,
+  //           text: text || "",
+  //           group: group || "",
+  //           ontime, // new ON cycle
+  //         },
+  //         update: {
+  //           // If it already exists, update status
+  //           status: initialStatus,
+  //           // Note: If you want to mark OFF or ACK, do it in future updates 
+  //           updatedAt: new Date(),
+  //         },
+  //       });
+  //     }
+  
+  //     // 3) If "toremove" is set, remove the alarm from the DB (main alarm table).
+  //     if (toremove) {
+  //       await prisma.alarm.delete({ where: { id: newAlarm.id } });
+  //       console.log(`❌ Alarm ${newAlarm.id} deleted.`);
+  //     }
+  
+  //     res
+  //       .status(200)
+  //       .json({
+  //         success: true,
+  //         message: "Alarm processed successfully.",
+  //         alarm: newAlarm,
+  //       });
+  //   } catch (err) {
+  //     console.error(`❌ Error setting alarm: `, err);
+  //     res.status(500).json({
+  //       error: "unexpected_error",
+  //       message: err instanceof Error ? err.message : `${err}`,
+  //     });
+  //   }
+  // };

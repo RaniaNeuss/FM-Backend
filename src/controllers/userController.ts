@@ -356,8 +356,7 @@ export const logout = (req: Request, res: Response): void => {
 // Controller: Get all Users
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Debug: Log session details
-        console.log('Session Data:', req.session);
+    
 
         // Retrieve userId from session
          const userId = req.userId;       
@@ -384,9 +383,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     try {
        
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
-
+    
        // Retrieve userId from session
         const userId = req.userId;    
         console.log('userId:', userId);
@@ -412,8 +409,6 @@ export const editProfile = async (req: Request, res: Response): Promise<void> =>
     try {
    
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
 
        // Retrieve userId from session
         const userId = req.userId;   
@@ -600,47 +595,72 @@ export const editUser = async (req: Request, res: Response): Promise<void> => {
 
 
 // Controller: Delete User
+// Controller: Delete User by ID from route params
 export const deleteUser = async (req: Request, res: Response): Promise<void> => {
     try {
-    
-
-          
-
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
-
-       // Retrieve userId from session
-        const userId = req.userId;       console.log('userId:', userId);
-
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
-        // Check if user exists
-        const existingUser = await prisma.user.findUnique({ where: {  id: String(userId) } });
-        if (!existingUser) {
-             console.warn(`User with ID ${userId} not found`);
-            res.status(404).json({ error: "not_found", message: "User not found" });
-            return;
-        }
-
-        await prisma.user.delete({ where: { id: String(userId) } });
-         console.info(`User deleted successfully: ${userId}`);
-        res.status(204).end();
+      // 1) Debug: Log session details (optional)
+      console.log("Session Data:", req.session);
+  
+      // 2) Confirm that the current user is logged in
+      const loggedInUserId = req.userId;
+      console.log("loggedInUserId:", loggedInUserId);
+      if (!loggedInUserId) {
+        res
+          .status(401)
+          .json({ error: "unauthorized", message: "User is not logged in" });
+        return;
+      }
+  
+      // 3) Extract the target user ID from URL params (e.g. DELETE /users/:id)
+      const { id } = req.params;
+      if (!id) {
+        res
+          .status(400)
+          .json({ error: "validation_error", message: "No user ID provided in params" });
+        return;
+      }
+  
+      // 4) Check if the user we want to delete actually exists
+      const existingUser = await prisma.user.findUnique({ where: { id } });
+      if (!existingUser) {
+        console.warn(`User with ID ${id} not found`);
+        res.status(404).json({ error: "not_found", message: "User not found" });
+        return;
+      }
+  
+      // 5) Optionally, check if the logged-in user has permission to delete
+      //    For example, only a SuperAdmin or deleting themselves
+      //    (Uncomment / adapt if you want some permission logic:)
+      // const isAdmin = await prisma.user.findFirst({
+      //   where: { id: loggedInUserId, groups: { some: { name: "SuperAdmin" } } },
+      // });
+      // if (!isAdmin && loggedInUserId !== id) {
+      //   return res
+      //     .status(403)
+      //     .json({ error: "forbidden", message: "No permission to delete this user" });
+      // }
+  
+      // 6) Delete the user by ID
+      await prisma.user.delete({ where: { id } });
+      console.info(`User deleted successfully: ${id}`);
+  
+      // 7) Return status 204 (No Content)
+      res.status(204).end();
     } catch (err: any) {
-        console.error("api delete users: " + err.message);
-        handleError(res, err, "api delete users");
+      console.error("Error deleting user:", err.message);
+      // If you have a custom handleError:
+      // handleError(res, err, "api delete user");
+      // else just do:
+      res.status(500).json({ error: "unexpected_error", message: err.message });
     }
-};
-
+  };
+  
 // Controller: Get all Groups
 export const getGroups = async (req: Request, res: Response): Promise<void> => {
     try {
           
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
-
+     
        // Retrieve userId from session
         const userId = req.userId;       console.log('userId:', userId);
 
@@ -663,8 +683,6 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
     try {
           
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
 
        // Retrieve userId from session
         const userId = req.userId;       console.log('userId:', userId);
@@ -702,8 +720,7 @@ export const deleteGroup = async (req: Request, res: Response): Promise<void> =>
    
           
 
-       // Debug: Log session details
-       console.log('Session Data:', req.session);
+     
 
        // Retrieve userId from session
         const userId = req.userId;       console.log('userId:', userId);
