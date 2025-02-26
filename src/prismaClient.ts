@@ -1,35 +1,40 @@
-
-
 import { PrismaClient, Device, Tag as PrismaTag, Alarm } from '@prisma/client';
+import deviceManager from './runtime/devices/deviceManager';
+import alarmManager from './runtime/alarms/alarmmanager';
+
+// Reuse a single PrismaClient instance
+const basePrisma = new PrismaClient();
 
 interface Tag extends PrismaTag {
   alarms: Alarm[];
 }
-import deviceManager from './runtime/devices/deviceManager';
 
-import  alarmManager from './runtime/alarms/alarmmanager';
-
-
-
-const prisma = new PrismaClient().$extends({
+/**
+ * Extended Prisma with middleware that intercepts operations on Device, Tag, Alarm.
+ */
+const prisma = basePrisma.$extends({
   query: {
     device: {
+      /**
+       * Intercept all device operations: create, update, delete, etc.
+       */
       async $allOperations({ operation, args, query }) {
         console.log(`Intercepted operation on Device: ${operation}`);
 
         let prevDevice: Device | null = null;
 
         try {
-          // For "update" operation, fetch the previous state of the device
           if (operation === 'update') {
-            const deviceId = args.where?.id; // Ensure `id` exists in the `where` clause
-
+            const deviceId = args.where?.id;
             if (deviceId) {
+              // Fetch old device if you still need it:
               prevDevice = await prisma.device.findUnique({
-                where: { id: deviceId }, // Use `id` to find the device
+                where: { id: deviceId },
               });
             } else {
-              console.warn('No `id` provided in `where` clause for update operation.');
+              console.warn(
+                'No `id` provided in `where` clause for update operation on device.'
+              );
             }
           }
 
@@ -37,11 +42,13 @@ const prisma = new PrismaClient().$extends({
           const result = await query(args);
 
           if (operation === 'create') {
-            const device = result as Device;
-            console.log(`Device created with ID: ${device.id}`);
-            if (device.enabled) {
-              console.log(`Initializing polling for new device '${device.name}'...`);
-              deviceManager.initializeAndPollDevices([device]);
+            const createdDev = result as Device;
+            console.log(`Device created with ID: ${createdDev.id}`);
+            if (createdDev.enabled) {
+              console.log(
+                `Initializing polling for new device '${createdDev.name}'...`
+              );
+              deviceManager.initializeAndPollDevices([createdDev]);
             }
           } else if (operation === 'delete') {
             const deletedDeviceId = args.where?.id;
@@ -50,104 +57,92 @@ const prisma = new PrismaClient().$extends({
               deviceManager.handleDeviceDeleted(deletedDeviceId);
             }
           } else if (operation === 'update') {
-            const updatedDevice = result as Device;
+            const updatedDev = result as Device;
             if (prevDevice) {
-              console.log(`Device updated with ID: ${updatedDevice.id}`);
-              deviceManager.handleDeviceUpdated(updatedDevice, prevDevice);
+              console.log(`Device updated with ID: ${updatedDev.id}`);
+              deviceManager.handleDeviceUpdated(updatedDev, prevDevice);
             } else {
-              console.warn(`No previous state found for device with ID: ${args.where?.id}`);
+              console.warn(
+                `No previous device state found for update. (ID: ${args.where?.id})`
+              );
             }
           }
 
           return result;
         } catch (err) {
-          console.error('Error in Prisma middleware:', err);
+          console.error('Error in Prisma device middleware:', err);
           throw err;
         }
       },
     },
-   
 
+    tag: {
+      /**
+       * Intercept all tag operations
+       */
+      async $allOperations({ operation, args, query }) {
+        console.log(`📡 Intercepted operation on Tag: ${operation}`);
 
-
-    
-  tag: {
-  async $allOperations({ operation, args, query }) {
-    console.log(`📡 Intercepted operation on Tag: ${operation}`);
-    
-
-    let prevTag: Tag | null = null;
-
-    try {
-      if (operation === "update") {
-        const tagId = args.where?.id;
-        if (tagId) {
-          prevTag = await prisma.tag.findUnique({
-            where: { id: tagId },
-            include: { alarms: true }, // ✅ Fetch alarms associated with the tag
-          });
-        } else {
-          console.warn("⚠️ No `id` provided in `where` clause for update operation.");
+        // If we're updating a single Tag record, ensure the updated record includes alarms.
+        if (operation === 'update') {
+          // Extend or create the `args.include` so we get `alarms` in the returned record
+          if (!args.include) {
+            args.include = { alarms: true };
+          } else {
+            args.include.alarms = true;
+          }
         }
-      }
 
-      const result = await query(args);
+        // Execute the original operation
+        const result = await query(args);
 
-      if (operation === "update") {
-        const updatedTag = result as Tag;
+        if (operation === 'update') {
+          // Because of `args.include = { alarms: true }`, `result` should have the updated Tag with alarms.
+          const updatedTag = result as Tag;
+          console.log(
+            `📌 Tag '${updatedTag.label}' updated with new value: '${updatedTag.value}'`
+          );
 
-
-        if (prevTag) {
-          console.log(`📌 Tag '${updatedTag.label}' Previous Value: ${prevTag.value}, New Value: ${updatedTag.value}`);
-
-
-          if (prevTag.alarms.length > 0 && prevTag.value !== updatedTag.value) {
-    
+          // If the updated tag has alarms, re-check them
+          if (updatedTag.alarms && updatedTag.alarms.length > 0) {
+            // This call triggers the alarm logic (min/max check, etc.)
             alarmManager.updateAlarmsByTag(updatedTag);
           }
-        } else {
-          console.warn(`⚠️ No previous state found for tag with ID: ${args.where?.id}`);
         }
-      }
-      return result;
-    } catch (err) {
-      console.error("❌ Error in Prisma middleware:", err);
-      throw err;
-    }
-  },
-},
 
-  
+        return result;
+      },
+    },
+
     alarm: {
+      /**
+       * Intercept all alarm operations
+       */
       async $allOperations({ operation, args, query }) {
-        console.log(`Intercepted operation on alarm : ${operation}`);
-    
-        let prevAlarm: Alarm | null = null;
-    
-        // Fetch previous state on update if available.
-        if (operation === "update") {
+        console.log(`Intercepted operation on alarm: ${operation}`);
 
+        let prevAlarm: Alarm | null = null;
+
+        // If "update", fetch the old alarm if you need it
+        if (operation === 'update') {
           const alarmId = args.where?.id;
           if (alarmId) {
-            prevAlarm = await prisma.alarm.findUnique({
-              where: { id: alarmId },
-            });
+            prevAlarm = await prisma.alarm.findUnique({ where: { id: alarmId } });
           }
         }
-    
+
         const result = await query(args);
-    
+
         try {
-          if (operation === "create") {
+          if (operation === 'create') {
             const newAlarm = result as Alarm;
             console.log(`✅ Alarm created with ID: ${newAlarm.id}`);
             alarmManager.addOrUpdateAlarmInMemory(newAlarm);
-          } else if (operation === "update") {
+          } else if (operation === 'update') {
             const updatedAlarm = result as Alarm;
             console.log(`♻ Alarm updated with ID: ${updatedAlarm.id}`);
-            // Always update the in-memory state, regardless of prevAlarm
             alarmManager.addOrUpdateAlarmInMemory(updatedAlarm);
-          } else if (operation === "delete") {
+          } else if (operation === 'delete') {
             const deletedAlarmId = args.where?.id;
             if (deletedAlarmId) {
               console.log(`❌ Alarm deleted with ID: ${deletedAlarmId}`);
@@ -155,21 +150,13 @@ const prisma = new PrismaClient().$extends({
             }
           }
         } catch (err) {
-          console.error("Error syncing alarm changes to AlarmManager:", err);
+          console.error('Error syncing alarm changes to AlarmManager:', err);
         }
-    
+
         return result;
       },
-    }
-    
-
-
-
-  }
-  
-  
+    },
+  },
 });
 
 export default prisma;
-
-

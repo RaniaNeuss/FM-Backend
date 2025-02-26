@@ -22,6 +22,7 @@ model Project {
   texts         Text[]
   events        Event[]
   views         View[]
+  AlarmDefinition  AlarmDefinition[]
   users         User[]   @relation("ProjectToUser")
   userId      String   // Foreign key to the User
   @@unique([name, userId]) // Enforce uniqueness of project name per user
@@ -103,6 +104,7 @@ model Tag {
   deviceId   String
   daq        Daq?
   alarms     Alarm[]  @relation("TagAlarms") // Relation to Alarm
+  AlarmDefinition  AlarmDefinition[]  @relation("TagAlarms") // Relation to Alarm
   variables  Variable[] @relation("TagVariables") // Relation to Variable
   bitmask    Int? 
   items      Item[]
@@ -130,7 +132,20 @@ model Variable {
 
 }
 
+model AlarmDefinition {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  tagId       String
+  subproperty String?
+  isEnabled   Boolean  @default(false)
 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  alarms         Alarm[]   @relation("AlarmDefinitionToAlarm")
+  project     Project @relation(fields: [projectId], references: [id])
+  tag         Tag     @relation(fields: [tagId], references: [id], name: "TagAlarms")
+}
 
 model Alarm {
   id             String         @id @default(uuid())
@@ -144,7 +159,8 @@ model Alarm {
   offtime         DateTime?
   acktime          DateTime?
   userack   String?
-
+  definitionId  String // references AlarmDefinition
+  definition     AlarmDefinition  @relation("AlarmDefinitionToAlarm", fields: [definitionId], references: [id])
 
   isEnabled      Boolean        @default(false)
   createdAt      DateTime       @default(now())

@@ -425,7 +425,6 @@ class AlarmsManager {
 
 
   public async updateAlarmsByTag(updatedTag: TagModel): Promise<void> {
-    console.log(`Updating alarms in memory for tag ${updatedTag.id}`);
     for (const nameKey in this.alarms) {
       const groupAlarms = this.alarms[nameKey];
       for (let i = 0; i < groupAlarms.length; i++) {
@@ -435,7 +434,7 @@ class AlarmsManager {
         if (alarm.tag && alarm.tag.id === updatedTag.id) {
           // 2) Skip if alarm is not enabled
           if (!alarm.isEnabled) {
-            console.log(`Alarm ${alarm.id} is disabled; skipping re-check for updated tag ${updatedTag.id}.`);
+            // console.log(`Alarm ${alarm.id} is disabled; skipping re-check for updated tag ${updatedTag.id}.`);
             continue;
           }
   
@@ -534,7 +533,7 @@ class AlarmsManager {
       for (let i = groupAlarms.length - 1; i >= 0; i--) {
         const alarm = groupAlarms[i];
         if (!alarm.isEnabled) continue;
-      console.log(`Group: "${nameKey}" has ${groupAlarms.length} alarms.`);
+      // console.log(`Group: "${nameKey}" has ${groupAlarms.length} alarms.`);
 
         // Use the tag value directly from alarm.tag (which should be up-to-date)
         let tagValue: number | null = null;
