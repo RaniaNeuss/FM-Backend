@@ -9,11 +9,11 @@ export const createView = async (req: Request, res: Response): Promise<void> => 
            
         const { projectId } = req.params;
         const { name, width, height, backgroundColor,gridType,property,description} = req.body;
-        const userId = req.userId;
-          if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
+    //     const userId = req.userId;
+    //       if (!userId) {
+    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+    //        return;
+    //    }
          const existingproject = await prisma.project.findFirst({
             where: {
                 id:projectId
@@ -77,10 +77,10 @@ export const getAllViews = async (req: Request, res: Response): Promise<void> =>
        const userId = req.userId;
 
 
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
+    //    if (!userId) {
+    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+    //        return;
+    //    }
         const { projectId } = req.params;
 
         if (!projectId) {
@@ -124,13 +124,13 @@ export const getViewById = async (req: Request, res: Response): Promise<void> =>
     try {
        
 
-        // Retrieve userId from session
+        // // Retrieve userId from session
         const userId = req.userId;
 
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
+        // if (!userId) {
+        //     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+        //     return;
+        // }
 
         const { projectId, id } = req.params; // Retrieve projectId and viewId from params
 
@@ -191,10 +191,10 @@ export const updateView = async (req: Request, res: Response): Promise<void> => 
         console.log('Session Data:', req.session);
 
         const userId = req.userId;
-        if (!userId) {
-            res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-            return;
-        }
+        // if (!userId) {
+        //     res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+        //     return;
+        // }
 
         const { projectId, id } = req.params;
         const { name, width, height, backgroundColor, description, property, gridType, items } = req.body;
@@ -294,10 +294,10 @@ export const deleteView = async (req: Request, res: Response): Promise<void> => 
        const userId = req.userId;
      
 
-       if (!userId) {
-           res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
-           return;
-       }
+    //    if (!userId) {
+    //        res.status(401).json({ error: 'unauthorized', message: 'User is not logged in' });
+    //        return;
+    //    }
         const { projectId, id } = req.params;
 
         if (!id || !projectId) {
