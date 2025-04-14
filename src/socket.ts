@@ -36,10 +36,14 @@ const initializeSocket = (app: Application) => {
   });
   
 
+<<<<<<< HEAD
   events.on('variable-changes', ({ deviceId, changes }) => {
     console.log(`Broadcasting variable-changes for deviceId: ${deviceId}`, changes);
     io.emit('variable-changes', { deviceId, changes });
   });
+=======
+
+>>>>>>> 3763440 (Initial commit)
 
 
   // Broadcast function for external modules to emit custom events

@@ -5,6 +5,7 @@ import cors from 'cors';
 import cookieParser from "cookie-parser";
 import prisma from './prismaClient'; // Import Prisma Client
 import initializeSocket from './socket'; // Import Socket Initialization
+<<<<<<< HEAD
 
 // import projectRoutes from './routes/projectRoutes';
 
@@ -12,6 +13,9 @@ import userRoutes from './routes/userRoutes';
 
 // import notificationRoutes from './routes/notificationRoutes';
 // import settingsRoutes from './routes/settingsRoutes';
+=======
+import userRoutes from './routes/userRoutes';
+>>>>>>> 3763440 (Initial commit)
 import rfpRoutes from './routes/rfpRoutes';
 import { PORT } from "./lib/config";
 
@@ -55,7 +59,11 @@ app.use('/api/rfp', rfpRoutes);
 
 // Initialize Socket.IO
 const { io, events,server } = initializeSocket(app);
+<<<<<<< HEAD
 // Export the Socket.IO instance for use in other modules
+=======
+
+>>>>>>> 3763440 (Initial commit)
 export { io };
 
 
