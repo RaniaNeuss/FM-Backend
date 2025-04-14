@@ -9,29 +9,6 @@ datasource db {
 
 
 
-model Project {
-  id            String          @id @default(uuid())
-  name          String          
-  description   String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  alarms        Alarm[]
-  devices       Device[]
-  reports       Report[]
-  scripts       Script[]
-  texts         Text[]
-  events        Event[]
-  views         View[]
-  AlarmDefinition  AlarmDefinition[]
-  users         User[]   @relation("ProjectToUser")
-  userId      String   // Foreign key to the User
-  @@unique([name, userId]) // Enforce uniqueness of project name per user
-  notifications Notification[]  // Add this line to establish the relationship
-
-  settings      Settings?       @relation("ProjectSettings")  
-
-}
-
 
 model User {
   id        String          @id @default(uuid())
@@ -43,192 +20,8 @@ model User {
   password  String
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  projects  Project[]       @relation("ProjectToUser")
-  groups    Group[]   @relation("UserGroups")
-  alarms    Alarm[]         @relation("AlarmAcknowledgements") // Fixed relation to Alarm model
-  alarmHistories AlarmHistory[]   @relation("AlarmHistoryAcknowledgements")
+  groups    Group[]   @relation("UserGroups")  //roles
 }
-
-
-
-
-model View {
-  id                String   @id @default(uuid())
-  name             String  
-  projectId        String
-  description      String?
-  width            Int?
-  property   String?     // JSON field to store basic objects  
-  height           Int?
-  backgroundColor  String?
-  gridType         String?
-  type             String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  items            Item[]
-
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-
-
-model Item {
-  id         String   @id @default(uuid())
-  viewId     String
-  type       String?   // 'widget' or 'symbol'
-  name       String?
-  property   String?     // JSON field to store properties  
-  address    String?
-  svgGuid    String?
-  label      String?
-  events     String?     // JSON field to store events (e.g., actoptions or onclose)
-  actions    String?     // JSON field to store actions (e.g., anticlockwise,  range, variableId, bitmask, range, type, and options.) 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now())
-  tagId      String?  // Add this field
-
-  variables  Variable[] @relation("ItemVariables") // Relation to Variable
-  tag        Tag?     @relation(fields: [tagId], references: [id])
-  view       View     @relation(fields: [viewId], references: [id], onDelete: Cascade)
-}
-
-model Tag {
-  id         String   @id @default(uuid())
-  name       String? 
-  address      String? 
-  value      String?
-  label      String?
-  type       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now())
-  deviceId   String
-  daq        Daq?
-  alarms     Alarm[]  @relation("TagAlarms") // Relation to Alarm
-  AlarmDefinition  AlarmDefinition[]  @relation("TagAlarms") // Relation to Alarm
-  variables  Variable[] @relation("TagVariables") // Relation to Variable
-  bitmask    Int? 
-  items      Item[]
-  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade, name: "DeviceTags")
-  @@unique([deviceId,address]) // Ensure tags are unique within the scope of a device
-
-}
-
-model Variable {
-  id        String   @id @default(uuid()) 
-  name      String?
-  type      String?
-  value     String?
-  property  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  itemId     String?  // Foreign key for Item
-  item       Item?    @relation("ItemVariables", fields: [itemId], references: [id])
-
-  tagId      String?  // Foreign key for Tag
-  tag        Tag?     @relation("TagVariables", fields: [tagId], references: [id])
-
-  daqs      Daq[]    @relation("VariableToDaq") 
-
-}
-
-model AlarmDefinition {
-  id          String   @id @default(uuid())
-  projectId   String
-  name        String
-  tagId       String
-  subproperty String?
-  isEnabled   Boolean  @default(false)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  alarms         Alarm[]   @relation("AlarmDefinitionToAlarm")
-  project     Project @relation(fields: [projectId], references: [id])
-  tag         Tag     @relation(fields: [tagId], references: [id], name: "TagAlarms")
-}
-
-model Alarm {
-  id             String         @id @default(uuid())
-  projectId      String
-  status         String?
-  name           String? 
-  type           String?
-  tagId          String         // Foreign key to associate with a Tag
-  subproperty     String?
-  ontime          DateTime?
-  offtime         DateTime?
-  acktime          DateTime?
-  userack   String?
-  definitionId  String // references AlarmDefinition
-  definition     AlarmDefinition  @relation("AlarmDefinitionToAlarm", fields: [definitionId], references: [id])
-
-  isEnabled      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  
-  project        Project        @relation(fields: [projectId], references: [id])
-  tag            Tag            @relation(fields: [tagId], references: [id], name: "TagAlarms") // Relation to Tag
-  alarmHistories AlarmHistory[]
-  users          User[]         @relation("AlarmAcknowledgements")
-}
-
-
-
-
-
-
-model AlarmHistory {
-  id        String    @id @default(uuid())
-  alarmId   String?
-  name           String? 
-  type      String?
-  status    String?
-  message   String?
-  group     String?  // Group associated with the alarm history
-  text      String?  // Additional details or description
-  ontime    DateTime?
-  offtime   DateTime?
-  acktime   DateTime?
-  userack   String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  alarm     Alarm?    @relation(fields: [alarmId], references: [id], onDelete: SetNull)
-  users          User[]         @relation("AlarmHistoryAcknowledgements")
-  
-  @@unique([alarmId, ontime], name: "alarmId_ontime")
-  
-
-}
-
-model Device {
-  id            String    @id @default(uuid())
-  projectId     String
-  name          String    @unique
-  description   String?
-  type          String?
-  property      String?
-  enabled       Boolean   @default(false)
-  polling       Int?
-  lastConnected DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  tags          Tag[]     @relation("DeviceTags")
-  deviceSecurity DeviceSecurity?
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model DeviceSecurity {
-  id       String  @id @default(uuid())
-  name     String  @unique
-  value    String
-  deviceId String  @unique
-  device   Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-}
-
-
-
-
 
 model Group {
   id       String  @id @default(uuid())
@@ -238,105 +31,38 @@ model Group {
 }
 
 
+model Rfp {
+  id           Int      @id @default(autoincrement())
+  typeOfRfp    String
+  reference    String   @unique
+  startDate       DateTime?
+  completionDate  DateTime?
+  panelMeetingDate DateTime?
+  panelDecisionDate DateTime?
 
-
-model Notification {
-  id            String   @id @default(uuid())
-  name          String
-  receiver      String
-  type          String
-  delay         Int?     @default(1)
-  interval      Int?     @default(0)   
-  enabled       Boolean  @default(false)
-  subscriptions String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now())
-    projectId     String   // Foreign key to the Project
-
-    project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade) // Add this line to establish the relationship
-
+  compliance   Compliance?
+  generalInfo  GeneralInfo?
+  location     Location?
+  flowMeasurement FlowMeasurement?
+  flowRegister FlowMonitoringRegister?
+  data         Data?
+  maf          MAF?
 }
 
 
 
+model Compliance {
+  id                      Int     @id @default(autoincrement())
+  rfpId                   Int     @unique
+  inletToTreatment        Boolean
+  outletFromTreatment     Boolean
+  terminalPumpDischarge   Boolean
+  dischargeAtPot          Boolean
+  tankerDischarge         Boolean
+  tankerFillPoint         Boolean
+  incidentReporting       Boolean
 
-
-model Settings {
-  id                   String   @id @default(uuid())
-  system               String?
-  form                 String?
-  smtp                 String?
-  daqstore             String?
-  alarms               String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  project              Project  @relation("ProjectSettings", fields: [projectId], references: [id], onDelete: Cascade)
-  projectId            String   @unique
-}
-
-
-
-
-
-model Report {
-  id          String   @id @default(uuid())
-  name        String
-  receiver    String
-  scheduling  String
-  docproperty String
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now())
-   projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-}
-
-model Script {
-  id         String   @id @default(uuid())
-  name       String
-  sync       Boolean  @default(false)
-  parameters String?
-  mode       String
-  code       String
-  permission Int
-  scheduling String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-}
-
-model Text {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-}
-
-model General {
-  id    String @id @default(uuid())
-  name  String @unique
-  value String
-}
-
-
-
-
-model Daq {
-  id        String   @id @default(uuid())
-  enabled   Boolean
-  timestamp DateTime @default(now())
-  value     String
-  interval  Int
-  changed   Boolean
-  restored  Boolean
-  variableId String
-  variable  Variable @relation(fields: [variableId], references: [id], name: "VariableToDaq")
-  tagId     String   @unique
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  rfp                     Rfp     @relation(fields: [rfpId], references: [id])
 }
 
 
@@ -345,11 +71,147 @@ model Daq {
 
 
 
-model Event {
-  id          String   @id @default(uuid())
-  projectId   String
-  type        String
-  description String
-  createdAt   DateTime @default(now())
-  project     Project  @relation(fields: [projectId], references: [id])
+model GeneralInfo {
+  id             Int     @id @default(autoincrement())
+  rfpId          Int     @unique
+  licensee       String
+  address        String
+  contactNumber  String
+  reportDate     DateTime
+  reportRef      String
+  responsible    String
+  position       String
+  department     String
+  siteScada      String
+  swsAssetNo     String
+   siteManagerName   String?       // NEW
+  faxNumber         String?       // NEW
+ 
+
+  rfp            Rfp     @relation(fields: [rfpId], references: [id])
+}
+
+model Location {
+  id                Int     @id @default(autoincrement())
+  rfpId             Int     @unique
+  region         String
+  stpcc          String
+  description       String
+  coordinateN       Float
+  coordinateE       Float
+  siteDrawingRef    String
+  flowDiagramRef    String
+
+  rfp               Rfp     @relation(fields: [rfpId], references: [id])
+}
+
+
+
+
+
+
+model FlowMeasurement {
+  id                     Int     @id @default(autoincrement())
+  rfpId                  Int     @unique
+  cumulativeFlow         Boolean
+  fifteenMinFlow         Boolean
+  eventRecording         Boolean
+ 
+
+  rfp                    Rfp     @relation(fields: [rfpId], references: [id])
+}
+
+
+
+
+
+
+
+
+model FlowMonitoringRegister {
+  id             Int      @id @default(autoincrement())
+  rfpId          Int      @unique
+  inventoryId    Int
+  installationId Int
+  maintenanceId  Int
+
+  rfp            Rfp       @relation(fields: [rfpId], references: [id])
+  inventory      Inventory @relation(fields: [inventoryId], references: [id])
+  installation   Installation @relation(fields: [installationId], references: [id])
+  maintenance    Maintenance  @relation(fields: [maintenanceId], references: [id])
+}
+
+
+model Inventory {
+  id             Int     @id @default(autoincrement())
+  make           String
+  type           String
+  model          String
+  serial         String
+  fmSize         String
+  pipelineSize   String
+  velocityRange  String
+  accuracyReading   String
+  accuracyFullScale String
+  readingMethod     String
+
+  flowRegister   FlowMonitoringRegister[] // One-to-many inverse relation
+}
+
+model Installation {
+  id                   Int     @id @default(autoincrement())
+  meterInstallDate    DateTime
+  meterRemovalDate     DateTime
+  hydraulicUpstream    String?
+  hydraulicDownstream  String?
+  environmental        String?
+  onSiteTesting        String?
+  safetyRisks          String?
+  securityOfLocation   String?
+
+  flowRegister         FlowMonitoringRegister[] // One-to-many inverse relation
+}
+
+model Maintenance {
+  id                        Int     @id @default(autoincrement())
+  maintenanceRef            Boolean
+  preventativeScheduleRef   Boolean
+
+  flowRegister              FlowMonitoringRegister[] // One-to-many inverse relation
+}
+
+
+
+
+
+
+
+
+
+model Data {
+  id                        Int     @id @default(autoincrement())
+  rfpId                     Int     @unique
+  manualMethod              String?
+  dataLogger                String?
+  remoteReading             String?
+  outstationDetails         String?
+  storageDetails            String?
+  ubReport                  String?
+  ubValue                   String?
+  dataManagementProcedure   String?
+
+  rfp                       Rfp     @relation(fields: [rfpId], references: [id])
+}
+
+
+
+model MAF {
+  id                     Int     @id @default(autoincrement())
+  rfpId                  Int     @unique
+  detail                 String?
+  sopRef                 String?
+  selectionSummary       String?
+  
+
+  rfp                    Rfp     @relation(fields: [rfpId], references: [id])
 }

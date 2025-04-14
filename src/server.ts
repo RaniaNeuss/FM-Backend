@@ -1,24 +1,18 @@
 import express from 'express';
-import swaggerUi from 'swagger-ui-express';
 import session from 'express-session';
 import passport from './lib/passportConfig';
 import cors from 'cors';
 import cookieParser from "cookie-parser";
-import swaggerDocument from './swagger.json';
 import prisma from './prismaClient'; // Import Prisma Client
 import initializeSocket from './socket'; // Import Socket Initialization
-import deviceManager from './runtime/devices/deviceManager';
-import projectRoutes from './routes/projectRoutes';
-import alarmManager from './runtime/alarms/alarmmanager'; // Import alarm manager
-import tagRoutes from './routes/tagRoutes';
+
+// import projectRoutes from './routes/projectRoutes';
 
 import userRoutes from './routes/userRoutes';
-import alarmRoutes from './routes/alarmRoutes';
-import viewRoutes from './routes/viewRoutes';
-import itemRoutes from './routes/itemRoutes';
-import notificationRoutes from './routes/notificationRoutes';
-import settingsRoutes from './routes/settingsRoutes';
-import deviceRoutes from './routes/deviceRoutes';
+
+// import notificationRoutes from './routes/notificationRoutes';
+// import settingsRoutes from './routes/settingsRoutes';
+import rfpRoutes from './routes/rfpRoutes';
 import { PORT } from "./lib/config";
 
 
@@ -53,46 +47,18 @@ app.use(passport.session());
 app.use(cookieParser()); // Parse cookies
 
 // Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Routes
 app.use('/api/users', userRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/views', viewRoutes);
-app.use('/api/items', itemRoutes);
-app.use('/api/alarms', alarmRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/devices', deviceRoutes);
-app.use('/api/tags', tagRoutes);
+app.use('/api/rfp', rfpRoutes);
+
 
 // Initialize Socket.IO
 const { io, events,server } = initializeSocket(app);
 // Export the Socket.IO instance for use in other modules
 export { io };
 
-const getexistingdevices = async () => {
-  try {
-    const devices = await prisma.device.findMany({
-      where: { enabled: true }, // Fetch enabled devices
-      include: { tags: true }, // Include tags for each device
-    });
 
-    console.log('Total enabled devices:', devices.length);
-
-    if (devices.length > 0) {
-      return devices;
-    }
-    return [];
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error fetching devices:', error.message);
-    } else {
-      console.error('Error fetching devices:', error);
-    }
-    return []; // Return an empty array if an error occurs
-  }
-};
 
 
 
@@ -104,13 +70,10 @@ const getexistingdevices = async () => {
 (async () => {
   try {
     // Run all tasks in parallel
-    const [devices] = await Promise.all([
-      getexistingdevices(), // Fetch devices concurrently
-    ]);
+  
 
     await Promise.all([
-      deviceManager.initializeAndPollDevices(devices), // Initialize and poll devices
-      alarmManager.start() // Start alarm manager
+     
     ]);
 
     console.log("✅ All services started successfully.");
@@ -123,5 +86,4 @@ const getexistingdevices = async () => {
 // Start the server
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
 });

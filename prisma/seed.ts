@@ -16,12 +16,12 @@ async function main() {
 
     // Seed user: SuperAdmin
     const superAdminUser = await prisma.user.upsert({
-        where: { email: 'admin@example.com' },
+        where: { email: '"rania@neuss.com' },
         update: {}, // If the user exists, don't modify it
         create: {
             username: 'admin',
-            email: 'admin@example.com',
-            password: await bcrypt.hash('password123', 10), // Hash the password
+            email: '"rania@neuss.com',
+            password: await bcrypt.hash('SuperAdmin@2025', 10), // Hash the password
             groups: {
                 connect: { id: superAdminGroup.id }, // Link to SuperAdmin group
             },
@@ -38,5 +38,5 @@ main()
     .catch((error) => {
         console.error("Seeding failed:", error);
         prisma.$disconnect();
-        process.exit(1);
+     
     });

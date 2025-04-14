@@ -19,29 +19,7 @@ const initializeSocket = (app: Application) => {
 
 
 // Listen for variable updates and update the database
-socket.on('variable-changes', async ({ deviceId, changes }: { deviceId: string, changes: Record<string, { value: any }> }) => {
-  console.log(`Received updates for device ${deviceId}`, changes);
 
-  for (const [name, { value }] of Object.entries(changes)) {
-    try {
-      const existingTag = await prisma.tag.findFirst({
-        where: { deviceId, name },
-      });
-
-      if (existingTag) {
-        await prisma.tag.update({
-          where: { id: existingTag.id },
-          data: { value, updatedAt: new Date() }
-        });
-        console.log(`✅ Updated tag '${name}' in database.`);
-      } else {
-        console.log(`⚠️ Tag '${name}' not found in database.`);
-      }
-    } catch (error) {
-      console.error(`❌ Error updating tag '${name}':`, error);
-    }
-  }
-});
 
 
 
