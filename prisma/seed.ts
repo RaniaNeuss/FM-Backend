@@ -20,7 +20,7 @@ async function main() {
         update: {}, // If the user exists, don't modify it
         create: {
             username: 'admin',
-            email: '"rania@neuss.com',
+            email: 'rania@neuss.com',
             password: await bcrypt.hash('SuperAdmin@2025', 10), // Hash the password
             groups: {
                 connect: { id: superAdminGroup.id }, // Link to SuperAdmin group

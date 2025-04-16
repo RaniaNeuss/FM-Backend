@@ -5,13 +5,7 @@ import cors from 'cors';
 import cookieParser from "cookie-parser";
 import prisma from './prismaClient'; // Import Prisma Client
 import initializeSocket from './socket'; // Import Socket Initialization
-
-// import projectRoutes from './routes/projectRoutes';
-
 import userRoutes from './routes/userRoutes';
-
-// import notificationRoutes from './routes/notificationRoutes';
-// import settingsRoutes from './routes/settingsRoutes';
 import rfpRoutes from './routes/rfpRoutes';
 import { PORT } from "./lib/config";
 
@@ -46,7 +40,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(cookieParser()); // Parse cookies
 
-// Swagger documentation
+
 
 // Routes
 app.use('/api/users', userRoutes);

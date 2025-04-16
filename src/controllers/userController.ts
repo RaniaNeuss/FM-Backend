@@ -191,9 +191,6 @@ export const Register= async (req: Request, res: Response): Promise<void> => {
 
 // Controller: Sign in User
 
-
-
-
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email, password } = req.body;
@@ -315,10 +312,6 @@ export const refreshtoken = async (req: Request, res: Response): Promise<void> =
 };
 
 
-
-
-
-
 export const authStatus = async (req: Request, res: Response): Promise<void> => {
     console.log("User in session:", req.user);
     if (req.isAuthenticated()) {
@@ -330,7 +323,6 @@ export const authStatus = async (req: Request, res: Response): Promise<void> => 
         res.status(401).json({ message: "Unauthorized user" });
     }
 };
-
 
 
 export const logout = (req: Request, res: Response): void => {
@@ -770,75 +762,3 @@ function handleError(res: Response, err: any, context: string): void {
 
 
 
-
-
-// export const login = async (req: Request, res: Response): Promise<void> => {
-//     try {
-//         const { email, password } = req.body;
-
-//         // Validate email and password
-//         if (!email || !password) {
-//             res.status(400).json({ message: "Email and password are required" });
-//             return;
-//         }
-
-//         // Check if the user exists
-//         const user = await prisma.user.findUnique({
-//             where: { email },
-//             include: { groups: true },
-//         });
-
-//         if (!user) {
-//             res.status(401).json({ message: "Invalid email or password" });
-//             return;
-//         }
-
-//         // Verify the password
-//         const isPasswordValid = await bcrypt.compare(password, user.password);
-//         if (!isPasswordValid) {
-//             res.status(401).json({ message: "Invalid email or password" });
-//             return;
-//         }
-
-//         // Generate Access Token (short-lived, stored in localStorage on the frontend)
-//         const token = jwt.sign(
-//             { id: user.id, email: user.email },
-//             JWT_SECRET,
-//             { expiresIn: "15m" } // 15 minutes
-//         );
-
-//         // Generate Refresh Token (long-lived, stored in an HTTP-only cookie)
-//         const refreshToken = jwt.sign(
-//             { id: user.id },
-//             REFRESH_SECRET,
-//             { expiresIn: "7d" } // 7 days
-//         );
-
-//         console.log("Refresh Token Set:", refreshToken);
-
-//         // Store the user ID in the session for session-based login
-//         req.session.userId = user.id;
-
-//         // Set refresh token as a secure HTTP-only cookie
-//         res.cookie("refreshToken", refreshToken, {
-//             httpOnly: true,
-//             secure: process.env.NODE_ENV === "production", // Set secure flag in production
-//             sameSite: "strict",
-//             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-//         });
-
-//         console.log("Refresh Token Set:", refreshToken);
-
-//         // Send access token to frontend for localStorage
-//         res.status(200).json({
-//             message: "User logged in successfully",
-//             token,
-//             expiresIn: 15 * 60, // 15 minutes in seconds
-//             email: user.email,
-//             groups: user.groups?.map((group) => group.name),
-//         });
-//     } catch (err: any) {
-//         console.error("Failed to log in:", err.message);
-//         res.status(500).json({ error: "unexpected_error", message: "An error occurred during login" });
-//     }
-// };

@@ -18,8 +18,6 @@ const initializeSocket = (app: Application) => {
     console.log('New Socket.IO connection established.');
 
 
-// Listen for variable updates and update the database
-
 
 
 
@@ -36,10 +34,6 @@ const initializeSocket = (app: Application) => {
   });
   
 
-  events.on('variable-changes', ({ deviceId, changes }) => {
-    console.log(`Broadcasting variable-changes for deviceId: ${deviceId}`, changes);
-    io.emit('variable-changes', { deviceId, changes });
-  });
 
 
   // Broadcast function for external modules to emit custom events

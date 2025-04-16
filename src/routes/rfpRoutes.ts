@@ -10,7 +10,7 @@ const router = Router();
 // Create a new device
 router.post('/create',authenticateUser, createFullRfp); // POST /api/devices/create
 
-router.post('/filter', getFilteredRfps)
+router.post('/filter',authenticateUser, getFilteredRfps)
 
 
 
